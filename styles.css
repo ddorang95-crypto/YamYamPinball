@@ -899,3 +899,10 @@ body.unified .participantList .personBallCount small{
   font-size:9px!important;
   line-height:1!important;
 }
+
+
+/* v17.6 step3: 현재 참가자 목록에서는 추가자 이니셜을 숨기고 이름 가독성을 우선 */
+.admin .participantList .ownerInitialBadge,
+body.unified .participantList .ownerInitialBadge{display:none!important}
+.admin .participantList .participantName,
+body.unified .participantList .participantName{flex:1 1 120px!important;min-width:82px!important;padding-left:2px!important}
