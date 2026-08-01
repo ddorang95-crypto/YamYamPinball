@@ -66,7 +66,8 @@ function newRoom(code) {
     startedAt: 0,
     duration: 0,
     updatedAt: now(),
-    snapshotSeq: 0
+    snapshotSeq: 0,
+    interactionSeq: 0
   };
 }
 
@@ -265,9 +266,26 @@ function handleAction(res, data) {
             seq, raceId
           };
           touch(room);
+          broadcastSnapshot(room);
         }
       }
       break;
+    }
+    case 'interaction': {
+      const it = data.interaction && typeof data.interaction === 'object' ? data.interaction : {};
+      const seq = Math.max(Number(room.interactionSeq || 0) + 1, Number(it.seq || 0));
+      room.interactionSeq = seq;
+      broadcastInteraction(room, {
+        seq,
+        source: String(it.source || '').slice(0, 80),
+        type: String(it.type || '').slice(0, 30),
+        elementId: String(it.elementId || '').slice(0, 80),
+        label: String(it.label || '').slice(0, 80),
+        x: Math.max(0, Math.min(1, Number(it.x) || 0)),
+        y: Math.max(0, Math.min(1, Number(it.y) || 0)),
+        at: now()
+      });
+      return json(res, 200, { ok: true });
     }
     case 'finishBall': {
       if (room.status === 'running') {
@@ -305,7 +323,7 @@ function handleAction(res, data) {
     default: throw new Error('지원하지 않는 요청입니다.');
   }
 
-  if (action !== 'snapshot') broadcastRoom(room);
+  if (action !== 'snapshot' && action !== 'interaction') broadcastRoom(room);
 
   // 고빈도 요청은 거대한 room 전체를 다시 JSON 직렬화하지 않는다.
   // 이것이 관리자 물리 루프까지 막아 공이 멈춰 보이던 주원인이었다.
@@ -315,6 +333,25 @@ function handleAction(res, data) {
   responseState(res, room);
 }
 
+
+function writeRoomPacket(room, packet) {
+  const key = cleanRoom(room.code);
+  const clients = roomStreams.get(key);
+  if (!clients || !clients.size) return;
+  const payload = `data: ${JSON.stringify(packet)}\n\n`;
+  for (const res of [...clients]) {
+    try { res.write(payload); } catch { clients.delete(res); }
+  }
+  if (!clients.size) roomStreams.delete(key);
+}
+
+function broadcastSnapshot(room) {
+  writeRoomPacket(room, { ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot });
+}
+
+function broadcastInteraction(room, interaction) {
+  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction });
+}
 
 function broadcastRoom(room) {
   const key = cleanRoom(room.code);

@@ -836,3 +836,5 @@ body.unified #msg{grid-column:1/-1}
  body.unified .adminGrid .actionGroup{grid-column:1/-1}
 }
 @media(max-width:700px){body.unified .adminGrid{grid-template-columns:1fr!important}.roomTabs{justify-content:flex-start}.stage aside{width:31%!important}.stage #raceCanvas{width:100%!important}}
+.remoteActivated{animation:remoteActivatedPulse .42s ease-out!important}
+@keyframes remoteActivatedPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.95);filter:brightness(1.8)}100%{box-shadow:0 0 0 14px rgba(255,255,255,0);filter:brightness(1)}}
