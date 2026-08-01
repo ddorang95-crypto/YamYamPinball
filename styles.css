@@ -839,46 +839,18 @@ body.unified #msg{grid-column:1/-1}
 .remoteActivated{animation:remoteActivatedPulse .42s ease-out!important}
 @keyframes remoteActivatedPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.95);filter:brightness(1.8)}100%{box-shadow:0 0 0 14px rgba(255,255,255,0);filter:brightness(1)}}
 
-
-/* v18 unified input consolidation + compact participant names */
-body.unified .unifiedBottom{grid-template-columns:1fr!important;grid-template-rows:auto minmax(100px,auto)!important}
-body.unified .adminGrid{grid-column:1!important;grid-row:1!important;grid-template-columns:1.65fr 1.05fr 1fr!important}
-body.unified .combinedJoinGroup{display:grid!important;grid-template-columns:1fr!important;gap:6px!important;padding:9px!important}
-body.unified .ownerSaveRow,body.unified .singleAddRow,body.unified .bulkActionRow{display:flex;gap:6px;min-width:0}
-body.unified .ownerSaveRow input,body.unified .singleAddRow input{min-width:0;flex:1 1 auto}
-body.unified .singleAddRow #countInput{flex:0 0 72px}
-body.unified .combinedJoinGroup textarea{height:50px!important;min-height:50px!important;resize:vertical}
-body.unified .ownerHint{font-size:11px;opacity:.72;line-height:1.25}
-body.unified .participantBoard{grid-column:1!important;grid-row:2!important;min-height:105px!important;max-height:175px!important}
-body.unified .participantList{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;gap:4px!important;padding:5px!important;max-height:140px!important}
-body.unified .participantList .pitem{display:flex!important;align-items:center!important;min-width:0!important;min-height:42px!important;padding:4px 6px!important;gap:5px!important}
-body.unified .participantList .participantName{display:block!important;flex:1 1 auto!important;min-width:42px!important;max-width:none!important;font-size:13px!important;line-height:1.1!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:#fff!important}
-body.unified .ownerInitialBadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#6d59e8;color:#fff;font-style:normal;font-size:10px;font-weight:900;vertical-align:middle}
-body.unified .participantList .personRank{font-size:10px!important;min-width:17px!important}
-body.unified .participantList .colorDot{width:8px!important;height:8px!important;flex:0 0 8px!important}
-body.unified .participantList .ballAdjust{gap:3px!important;flex:0 0 auto!important}
-body.unified .participantList .personBallCount{min-width:38px!important}
-body.unified .participantList .personBallCount strong{font-size:16px!important}
-body.unified .participantList .personBallCount small{font-size:10px!important}
-body.unified .participantList .countMinus,body.unified .participantList .countPlus{width:29px!important;min-width:29px!important;height:31px!important;min-height:31px!important;padding:0!important;font-size:15px!important}
-body.unified .participantList .countSet{min-height:31px!important;height:31px!important;padding:0 7px!important;font-size:10px!important}
-@media(max-width:1100px){body.unified .adminGrid{grid-template-columns:1fr 1fr!important}.combinedJoinGroup{grid-column:1/-1!important}}
-@media(max-width:700px){body.unified .adminGrid{grid-template-columns:1fr!important}.ownerSaveRow,.singleAddRow,.bulkActionRow{flex-wrap:wrap}.ownerSaveRow input,.singleAddRow input{flex:1 1 140px!important}}
-
-
-/* v19.1 stability rollback + compact linked-name input */
-body.unified .ownerSaveRow{justify-content:flex-start!important}
-body.unified .ownerSaveRow #ownerInput{flex:0 1 230px!important;width:230px!important;max-width:230px!important}
-body.unified .ownerSaveRow #saveOwner{flex:0 0 auto!important;white-space:nowrap}
-body.unified .singleAddRow #nameInput{flex:0 1 260px!important;width:260px!important;max-width:260px!important}
-body.unified .singleAddRow #countInput{flex:0 0 68px!important;width:68px!important}
-body.unified .participantList .participantName{font-size:12px!important;min-width:58px!important}
-body.unified .participantList{grid-template-columns:repeat(auto-fit,minmax(185px,1fr))!important}
-@media(max-width:700px){body.unified .ownerSaveRow #ownerInput,body.unified .singleAddRow #nameInput{width:auto!important;max-width:none!important;flex:1 1 150px!important}}
-
-/* v19.2 추가자 이름 연동 및 입력창 정리 */
-body.unified .ownerSaveRow{align-items:center!important;flex-wrap:nowrap!important}
-body.unified .ownerSaveRow #ownerInput{flex:0 0 170px!important;width:170px!important;max-width:170px!important}
-body.unified .ownerSavedBadge{display:inline-flex;align-items:center;justify-content:center;min-width:82px;height:34px;padding:0 10px;border:1px solid rgba(150,130,255,.55);border-radius:9px;background:rgba(77,57,145,.35);color:#efeaff;font-size:12px;font-weight:900;white-space:nowrap}
-body.unified .ownerSavedBadge[data-mark="Y"]{border-color:#ff76c8} body.unified .ownerSavedBadge[data-mark="G"]{border-color:#7ee7ff} body.unified .ownerSavedBadge[data-mark="M"]{border-color:#ffd166} body.unified .ownerSavedBadge[data-mark="D"]{border-color:#8ff0a4}
-@media(max-width:700px){body.unified .ownerSaveRow{flex-wrap:wrap!important}body.unified .ownerSaveRow #ownerInput{flex:1 1 140px!important;width:auto!important;max-width:none!important}}
+/* v17.6-base step 1: 메인 입력창 하나로 통합 */
+body.unified .unifiedBottom{grid-template-columns:1fr!important;grid-template-rows:auto minmax(115px,auto)!important}
+body.unified .adminGrid{grid-column:1!important;grid-row:1!important;grid-template-columns:1.55fr 1.05fr 1fr!important}
+body.unified .participantBoard{grid-column:1!important;grid-row:2!important}
+body.unified .mergedEntryGroup{display:grid!important;grid-template-columns:110px 86px minmax(130px,1fr) 78px 96px;gap:7px!important;align-items:center!important}
+body.unified .mergedEntryGroup .cardTitle{grid-column:1/-1;margin:0!important;font-size:16px!important}
+body.unified .mergedEntryGroup #ownerInput{grid-column:1;min-width:0;width:100%}
+body.unified .mergedEntryGroup #saveOwner{grid-column:2}
+body.unified .mergedEntryGroup #nameInput{grid-column:3;min-width:0;width:100%}
+body.unified .mergedEntryGroup #countInput{grid-column:4;width:100%}
+body.unified .mergedEntryGroup #addBtn{grid-column:5}
+body.unified .mergedEntryGroup #bulkInput{grid-column:1/4;width:100%;height:46px}
+body.unified .mergedEntryGroup #bulkBtn{grid-column:4}
+body.unified .mergedEntryGroup #shuffleBtn{grid-column:5}
+@media(max-width:900px){body.unified .mergedEntryGroup{grid-template-columns:1fr 92px 1fr 76px!important}body.unified .mergedEntryGroup #ownerInput{grid-column:1}body.unified .mergedEntryGroup #saveOwner{grid-column:2}body.unified .mergedEntryGroup #nameInput{grid-column:3}body.unified .mergedEntryGroup #countInput{grid-column:4}body.unified .mergedEntryGroup #addBtn{grid-column:1/3}body.unified .mergedEntryGroup #bulkInput{grid-column:1/4}body.unified .mergedEntryGroup #bulkBtn{grid-column:4}body.unified .mergedEntryGroup #shuffleBtn{grid-column:1/-1}}

@@ -2,7 +2,7 @@
 'use strict';
 const YamyamApp=(()=>{
 const qs=new URLSearchParams(location.search),room=(qs.get('room')||'YAMYAM').replace(/[^A-Za-z0-9_-]/g,'').toUpperCase();
-let role='display',unifiedMode=false,eventSource=null,state=null,owner='',sim=null,lastRace=-1,polling=false,lastRankCount=-1,lastWinnerRace=-1,pendingWinMode=null,mutationBusy=false,winDraft=null,winSaveTimer=0,winSaveInFlight=false,winSaveQueued=false,localRunning=false,localRaceConfig=null,manualCam=null,snapshotInFlight=false,connectionFailures=0,resetInFlight=false,lifecycleEpoch=0,pendingMap=null,selectedMapLock=null,serverStateSuppressedUntil=0,lastRenderErrorAt=0,remoteBallView=new Map(),lastRemoteFrameTs=0,nameHueMap=new Map(),nextNameHueIndex=0,nameColorSignature='',winnerPopupFirstSeenAt=0,mapChangeToken=0,canvasDragFastForward=false,suppressNextCanvasClick=false,raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,lastResetSeq=0;
+let role='display',unifiedMode=false,eventSource=null,state=null,owner='',sim=null,lastRace=-1,polling=false,lastRankCount=-1,lastWinnerRace=-1,pendingWinMode=null,mutationBusy=false,winDraft=null,winSaveTimer=0,winSaveInFlight=false,winSaveQueued=false,localRunning=false,localRaceConfig=null,manualCam=null,snapshotInFlight=false,connectionFailures=0,resetInFlight=false,lifecycleEpoch=0,pendingMap=null,selectedMapLock=null,serverStateSuppressedUntil=0,lastRenderErrorAt=0,remoteBallView=new Map(),lastRemoteFrameTs=0,nameHueMap=new Map(),nextNameHueIndex=0,nameColorSignature='',winnerPopupFirstSeenAt=0,mapChangeToken=0,canvasDragFastForward=false,suppressNextCanvasClick=false,raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0;
 const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ADMIN_PREFS_KEY='yamyam_pinball_admin_prefs_'+room;
 // 모든 맵이 공유하는 기본 핀볼 연출 설정. 맵을 바꾸거나 경기를 초기화해도 이 값은 사라지지 않는다.
@@ -62,7 +62,7 @@ function restoreLobbyPreview(map,{clearParticipants=false}={}){
 function stopLocalRace({clearParticipants=false}={}){
  lifecycleEpoch++;
  if(sim)sim.paused=true;
- sim=null;localRunning=false;localRaceConfig=null;raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,lastResetSeq=0;lastRace=-1;lastWinnerRace=-1;winnerPopupFirstSeenAt=0;manualCam=null;
+ sim=null;localRunning=false;localRaceConfig=null;raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0;lastRace=-1;lastWinnerRace=-1;winnerPopupFirstSeenAt=0;manualCam=null;
  snapshotInFlight=false;
  if(state){state.status='lobby';state.finishOrder=[];state.winners=[];state.winnerDeclared=false;state.snapshot={balls:[],rot:[],gate:0,cam:0,camX:560,camZoom:.96};state.raceBalls=[];if(clearParticipants)state.participants=[]}
  // 새 판/맵 변경 즉시 이전 프레임을 지워 남은 공이 화면에 잔상으로 남지 않게 한다.
@@ -70,13 +70,6 @@ function stopLocalRace({clearParticipants=false}={}){
  const card=$('winnerCard');if(card)card.classList.remove('show','burst','winner-pop');
  const names=$('winnerNames');if(names)names.innerHTML='';
  renderRank.lastScrollKey='';renderRank.winnerLocked=false;lastRankCount=-1;rankNodes.clear();rankStatusCache.clear();liveRankMemory.clear();remoteBallView.clear();lastRemoteFrameTs=0;
- const rankList=$('rankList');if(rankList)rankList.replaceChildren();
-}
-function clearSharedRaceVisuals(){
- remoteBallView.clear();lastRemoteFrameTs=0;lastAcceptedSnapshotSeq=0;remoteSnapshotReceivedAt=0;sharedPointer=null;
- const card=$('winnerCard');if(card)card.classList.remove('show','burst','winner-pop');
- const names=$('winnerNames');if(names)names.textContent='';winnerPopupFirstSeenAt=0;lastWinnerRace=-1;
- for(const id of ['raceCanvas','minimapCanvas']){const c=$(id);if(c){const g=c.getContext('2d');g?.clearRect(0,0,c.width,c.height)}}
  const rankList=$('rankList');if(rankList)rankList.replaceChildren();
 }
 const clientId=(crypto?.randomUUID?.()||('c'+Math.random().toString(36).slice(2)));
@@ -121,11 +114,7 @@ function connectRoomEvents(){
    const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
    if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
    if(state?.raceBalls&&!incoming.raceBalls)incoming.raceBalls=state.raceBalls;
-   const previousRace=state?.raceId,previousStatus=state?.status,incomingReset=Number(incoming.resetSeq||0);
-   if(incomingReset!==Number(lastResetSeq||0)||(incoming.status==='lobby'&&previousStatus&&previousStatus!=='lobby')){
-    if(localRunning||sim)stopLocalRace({clearParticipants:false});else clearSharedRaceVisuals();
-   }
-   lastResetSeq=incomingReset;state=incoming;ui();
+   const previousRace=state?.raceId;state=incoming;ui();
    if(role==='admin'&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&state.raceId!==lastRace&&Number(raceHostId)===Number(state.raceId)){
     startPhysics();localRunning=true;localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
    }
@@ -138,8 +127,8 @@ async function poll(){
  // 관리자 로컬 물리가 권위 소스인 동안에는 자기 스냅샷을 다시 내려받아 파싱하지 않는다.
  // 네트워크/JSON 작업이 메인 스레드를 막아 공이 중간에 멈추는 현상을 방지한다.
  if(role==='admin'&&localRunning&&sim){setTimeout(poll,350);return}
- if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(localRunning&&sim&&localRaceConfig){incoming.status='running';incoming.map=localRaceConfig.map;incoming.raceId=localRaceConfig.raceId;incoming.seed=localRaceConfig.seed;incoming.winMode=localRaceConfig.winMode;incoming.winningRanks=localRaceConfig.ranks}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(role==='admin'&&!unifiedMode&&!localRunning)applyAdminPrefs(incoming,selectedMapLock||incoming.map);const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;const previousStatus=state?.status,incomingReset=Number(incoming.resetSeq||0);if(incomingReset!==Number(lastResetSeq||0)||(incoming.status==='lobby'&&previousStatus&&previousStatus!=='lobby')){if(localRunning||sim)stopLocalRace({clearParticipants:false});else clearSharedRaceVisuals()}lastResetSeq=incomingReset;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(role==='admin'&&performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&state.raceId!==lastRace&&Number(raceHostId)===Number(state.raceId)){startPhysics();localRunning=true;localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]}}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
-function parseBulk(t){return String(t||'').split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.*?)(?:\s+(?:[xX*×]\s*)?(\d+))$/)||s.match(/^(.*?)(?:\s*[xX*×]\s*(\d+))$/);return{name:(m?.[1]||s).trim(),count:Math.max(1,Math.min(5000,Number(m?.[2]||1)|0))}}).filter(x=>x.name)}
+ if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(localRunning&&sim&&localRaceConfig){incoming.status='running';incoming.map=localRaceConfig.map;incoming.raceId=localRaceConfig.raceId;incoming.seed=localRaceConfig.seed;incoming.winMode=localRaceConfig.winMode;incoming.winningRanks=localRaceConfig.ranks}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(role==='admin'&&!unifiedMode&&!localRunning)applyAdminPrefs(incoming,selectedMapLock||incoming.map);const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(role==='admin'&&performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&state.raceId!==lastRace&&Number(raceHostId)===Number(state.raceId)){startPhysics();localRunning=true;localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]}}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
+function parseBulk(t){return t.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.*?)(?:\s*[xX*×]\s*(\d+))?$/);return{name:(m?.[1]||'').trim(),count:Math.max(1,Number(m?.[2]||1)|0)}}).filter(x=>x.name)}
 function bindAdmin(){
  if($('soloBtn'))$('soloBtn').onclick=()=>api('setMode',{mode:'solo'});if($('groupBtn'))$('groupBtn').onclick=()=>api('setMode',{mode:'group'});if($('saveTitle'))$('saveTitle').onclick=()=>api('setTitle',{title:$('titleInput').value});
  $('addBtn').onclick=()=>api('addParticipant',{name:$('nameInput').value,count:+$('countInput').value||1,owner:'ADMIN'}).then(()=>{$('nameInput').value=''});
@@ -221,7 +210,7 @@ $('clearBtn').onclick=async()=>{
 }
 function flash(t){const m=$('msg');if(!m)return;m.textContent=t;setTimeout(()=>{if(m.textContent===t)m.textContent=''},1800)}
 function bindMember(){owner=localStorage.getItem('pin_owner')||'';$('ownerInput').value=owner;$('saveOwner').onclick=()=>{owner=$('ownerInput').value.trim();localStorage.setItem('pin_owner',owner);flash('저장 완료')};$('addBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('addParticipant',{name:$('nameInput').value,count:+$('countInput').value||1,owner}).then(()=>{$('nameInput').value=''})};$('bulkBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('bulkAdd',{items:parseBulk($('bulkInput').value),owner}).then(()=>{$('bulkInput').value=''})}}
-function ownerMark(value){const raw=String(value||'').trim(),v=raw.toLowerCase();if(!raw)return'?';if(v.includes('야미')||v==='y'||v.includes('yami'))return'Y';if(v.includes('꿀혜')||v==='g'||v.includes('ggul'))return'G';if(v.includes('선하')||v==='m'||v.includes('seonha'))return'M';if(v.includes('도릿')||v==='d'||v.includes('dorit'))return'D';if(raw==='?')return'?';return raw.slice(0,1).toUpperCase()}
+function ownerMark(value){const v=String(value||'').trim().toLowerCase();if(v.includes('야미')||v==='y'||v.includes('yami'))return'Y';if(v.includes('꿀혜')||v==='g'||v.includes('ggul'))return'G';if(v.includes('선하')||v==='m'||v.includes('seonha'))return'M';if(v.includes('도릿')||v==='d'||v.includes('dorit'))return'D';return String(value||'').trim().slice(0,1).toUpperCase()}
 function balls(){const a=[];(state?.participants||[]).forEach(p=>{for(let i=1;i<=+p.count;i++)a.push({ballId:p.id+'_'+i,name:p.name,copy:i,owner:p.owner,ownerInitial:p.ownerInitial||ownerMark(p.owner)})});return a}
 function orderedBalls(){const a=balls(),rr=rnd((state?.seed||1)+(state?.shuffleNonce||0)*9973);for(let i=a.length-1;i>0;i--){const j=Math.floor(rr()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function previewGridBalls(){
@@ -235,7 +224,7 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 const mapNames={wheel:'🍭 캔디 수레바퀴',greed:'🏺 욕망의 항아리 REMIX'};
 function ui(){if(!state)return;refreshNameColors();if($('brand'))$('brand').textContent=state.title;if($('roomCode'))$('roomCode').textContent=state.code;if($('ballCount'))$('ballCount').textContent=balls().length;const modeText=state.mode==='solo'?'개인 핀볼':'단체 핀볼';if($('modeLabel'))$('modeLabel').textContent=modeText;if($('modeBadge')){$('modeBadge').textContent=modeText;$('modeBadge').className=state.mode==='solo'?'solo':'group'};if($('mapBadge'))$('mapBadge').textContent=mapNames[state.map]||state.map;const winText=state.winMode==='first'?'당첨: 첫 번째':state.winMode==='last'?'당첨: 마지막':'당첨: '+(state.winningRanks||[1]).join(', ')+'번째';if($('winBadge'))$('winBadge').textContent=winText;
  if(role==='admin'){$('titleInput').value=state.title;const fixedMap=selectedMapLock||pendingMap||state.map;selectedMapLock=mapNames[fixedMap]?fixedMap:(selectedMapLock||'wheel');$('mapSelect').value=selectedMapLock;$('mapSelect').disabled=false;const shownMode=pendingWinMode||(winDraft?.mode)||state.winMode||'first';const shownRanks=shownMode==='last'?[Math.max(1,balls().length)]:((winDraft?.ranks)||state.winningRanks||[1]);const wr=document.querySelector(`input[name=win][value=${shownMode}]`);if(wr)wr.checked=true;if(!pendingWinMode)$('rankNumber').value=shownRanks.join(',');$('rankNumber').disabled=shownMode!=='number';$('memberLink').textContent=location.origin+'/member.html?room='+state.code;if($('soloBtn'))$('soloBtn').classList.toggle('selected',state.mode==='solo');if($('groupBtn'))$('groupBtn').classList.toggle('selected',state.mode==='group');document.querySelectorAll('.winChoice').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));if($('winSaved')&&!pendingWinMode){const wt=shownMode==='first'?'당첨: 첫 번째':shownMode==='last'?'당첨: 마지막':'당첨: '+shownRanks.join(', ')+'번째';$('winSaved').textContent='현재 설정: '+wt}}
- if($('participants')){const l=(role==='member'&&!unifiedMode)?(state.participants||[]).filter(p=>p.owner===owner):(state.participants||[]),groups=new Map();for(const p of l){const key=(p.owner||'')+'\u0000'+p.name;const g=groups.get(key)||{name:p.name,owner:p.owner,ownerInitial:p.ownerInitial||ownerMark(p.owner),total:0,ids:[]};g.total+=Number(p.count)||0;g.ids.push(p.id);groups.set(key,g)}const rows=[...groups.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ko'));$('participants').innerHTML=rows.length?rows.map((g,i)=>`<div class=pitem style="--personColor:${getNameColor(g.name,1)};--personSoft:${getNameColor(g.name,.13)}"><span class=personRank>${i+1}</span><span class=colorDot style="--dot:${getNameColor(g.name,1)}"></span><b class=participantName>${esc(g.name)} <em class=ownerInitialBadge title="추가자: ${esc(g.owner||'미지정')}">${esc(g.ownerInitial||'?')}</em></b><div class=ballAdjust data-ids="${g.ids.join(',')}"><button class=countMinus type=button aria-label="공 1개 빼기">−</button><span class=personBallCount><strong>${g.total}</strong><small>개</small></span><button class=countPlus type=button aria-label="공 1개 추가">＋</button><button class=countSet type=button>갯수 조정</button></div></div>`).join(''):'<div class=emptyParticipants>추가된 참가자가 없습니다</div>';if($('participantSummary'))$('participantSummary').textContent=`${rows.length}명 · 총 ${rows.reduce((n,g)=>n+g.total,0)}공`;document.querySelectorAll('.ballAdjust').forEach(box=>{const ids=box.dataset.ids.split(',').filter(Boolean),current=Number(box.querySelector('.personBallCount strong')?.textContent)||0;box.querySelector('.countMinus').onclick=()=>{if(current<=1&&!confirm('이 참가자의 마지막 공까지 뺄까요?'))return;api('adjustParticipantGroup',{ids,delta:-1,owner,admin:role==='admin'})};box.querySelector('.countPlus').onclick=()=>api('adjustParticipantGroup',{ids,delta:1,owner,admin:role==='admin'});box.querySelector('.countSet').onclick=()=>{const raw=prompt('변경할 전체 공 개수를 입력해주세요. (0 입력 시 참가자 삭제)',String(current));if(raw===null)return;const count=Number(raw);if(!Number.isInteger(count)||count<0||count>5000){flash('0~5000 사이의 정수를 입력해주세요');return}if(count===0&&!confirm('이 참가자를 삭제할까요?'))return;api('adjustParticipantGroup',{ids,count,owner,admin:role==='admin'})}})}
+ if($('participants')){const l=(role==='member'&&!unifiedMode)?(state.participants||[]).filter(p=>p.owner===owner):(state.participants||[]),groups=new Map();for(const p of l){const key=(p.owner||'')+'\u0000'+p.name;const g=groups.get(key)||{name:p.name,owner:p.owner,total:0,ids:[]};g.total+=Number(p.count)||0;g.ids.push(p.id);groups.set(key,g)}const rows=[...groups.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ko'));$('participants').innerHTML=rows.length?rows.map((g,i)=>`<div class=pitem style="--personColor:${getNameColor(g.name,1)};--personSoft:${getNameColor(g.name,.13)}"><span class=personRank>${i+1}</span><span class=colorDot style="--dot:${getNameColor(g.name,1)}"></span><b>${esc(g.name)}</b><div class=ballAdjust data-ids="${g.ids.join(',')}"><button class=countMinus type=button aria-label="공 1개 빼기">−</button><span class=personBallCount><strong>${g.total}</strong><small>개</small></span><button class=countPlus type=button aria-label="공 1개 추가">＋</button><button class=countSet type=button>갯수 조정</button></div></div>`).join(''):'<div class=emptyParticipants>추가된 참가자가 없습니다</div>';if($('participantSummary'))$('participantSummary').textContent=`${rows.length}명 · 총 ${rows.reduce((n,g)=>n+g.total,0)}공`;document.querySelectorAll('.ballAdjust').forEach(box=>{const ids=box.dataset.ids.split(',').filter(Boolean),current=Number(box.querySelector('.personBallCount strong')?.textContent)||0;box.querySelector('.countMinus').onclick=()=>{if(current<=1&&!confirm('이 참가자의 마지막 공까지 뺄까요?'))return;api('adjustParticipantGroup',{ids,delta:-1,owner,admin:role==='admin'})};box.querySelector('.countPlus').onclick=()=>api('adjustParticipantGroup',{ids,delta:1,owner,admin:role==='admin'});box.querySelector('.countSet').onclick=()=>{const raw=prompt('변경할 전체 공 개수를 입력해주세요. (0 입력 시 참가자 삭제)',String(current));if(raw===null)return;const count=Number(raw);if(!Number.isInteger(count)||count<0||count>5000){flash('0~5000 사이의 정수를 입력해주세요');return}if(count===0&&!confirm('이 참가자를 삭제할까요?'))return;api('adjustParticipantGroup',{ids,count,owner,admin:role==='admin'})}})}
  renderWinner();}
 function hash(s){let h=2166136261;for(let c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 // 원본 Marble Roulette처럼 참가자 순서 전체를 360도 색상환에 균등 분배한다.
@@ -2285,52 +2274,12 @@ function bindUnified(){
  unifiedMode=true;role='admin';selectedMapLock=null;
  loadAdminPrefs();bindAdmin();
  owner=localStorage.getItem('pin_owner_'+room)||localStorage.getItem('pin_owner')||'';
- const ownerEl=$('ownerInput'),ownerBadge=$('ownerSavedBadge');
- if(ownerEl)ownerEl.value=owner;
- const normalizeOwner=(value)=>{
-  const raw=String(value||'').trim();
-  const v=raw.toLowerCase();
-  if(!raw)return'';
-  if(v==='y'||v.includes('야미')||v.includes('yami'))return'야미';
-  if(v==='g'||v.includes('꿀혜')||v.includes('ggul'))return'꿀혜';
-  if(v==='m'||v.includes('선하')||v.includes('seonha'))return'선하';
-  if(v==='d'||v.includes('도릿')||v.includes('dorit'))return'도릿';
-  return raw;
- };
- const updateOwnerBadge=()=>{
-  const typed=normalizeOwner(ownerEl?.value||owner||'');
-  if(ownerBadge){ownerBadge.textContent=typed?`${typed} (${ownerMark(typed)})`:'미지정 (?)';ownerBadge.dataset.mark=typed?ownerMark(typed):'?'}
- };
- const persistOwner=({silent=false}={})=>{
-  owner=normalizeOwner(ownerEl?.value||'');
-  if(ownerEl)ownerEl.value=owner;
-  if(owner){localStorage.setItem('pin_owner_'+room,owner);localStorage.setItem('pin_owner',owner);if(!silent)flash(`${ownerMark(owner)} · ${owner} 이름 저장 완료`)}
-  else{localStorage.removeItem('pin_owner_'+room);localStorage.removeItem('pin_owner');if(!silent)flash('이름 미지정 · 추가 공에는 ?가 표시됩니다')}
-  updateOwnerBadge();
-  return owner||'?';
- };
- const currentOwner=()=>persistOwner({silent:true});
- updateOwnerBadge();
- if(ownerEl){ownerEl.addEventListener('input',updateOwnerBadge);ownerEl.addEventListener('change',()=>persistOwner({silent:true}));ownerEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();persistOwner()}})}
- const saveOwnerBtn=$('saveOwner');if(saveOwnerBtn)saveOwnerBtn.onclick=()=>persistOwner();
- const addOne=async()=>{
-  const n=$('nameInput')?.value.trim()||'',c=+$('countInput')?.value||1,who=currentOwner();
-  if(!n){flash('참가 닉네임을 입력해주세요');return}
-  try{const j=await api('addParticipant',{name:n,count:c,owner:who});if($('nameInput'))$('nameInput').value='';state=j.state;ui();flash(`${ownerMark(who)} · 참가자 추가 완료`)}catch(e){flash(e.message||'등록 오류')}
- };
- const addBulk=async()=>{
-  const field=$('bulkInput'),raw=field?.value||'',items=parseBulk(raw),who=currentOwner();
-  if(!items.length){flash('일괄 추가할 이름을 입력해주세요');return}
-  const btn=$('bulkBtn');if(btn){btn.disabled=true;btn.textContent='추가 중…'}
-  try{
-   const j=await api('bulkAdd',{items,owner:who});
-   state=j.state;ui();
-   // 서버에 정상 반영된 뒤에만 입력창을 비운다.
-   if(field)field.value='';
-   flash(`${ownerMark(who)} · ${items.length}명 일괄 추가 완료`);
-  }catch(e){flash(e.message||'일괄 추가 오류')}
-  finally{if(btn){btn.disabled=false;btn.textContent='일괄 추가'}}
- };
+ const ownerEl=$('ownerInput');if(ownerEl)ownerEl.value=owner;
+ const saveOwner=()=>{owner=ownerEl?.value.trim()||'';if(!owner){flash('내 이름을 입력해주세요');return false}localStorage.setItem('pin_owner_'+room,owner);localStorage.setItem('pin_owner',owner);flash('이름 저장 완료');return true};
+ const saveOwnerBtn=$('saveOwner');if(saveOwnerBtn)saveOwnerBtn.onclick=saveOwner;
+ const currentOwner=()=>{const typed=ownerEl?.value.trim()||'';if(typed&&typed!==owner){owner=typed;localStorage.setItem('pin_owner_'+room,owner);localStorage.setItem('pin_owner',owner)}return owner||''};
+ const addOne=()=>{const who=currentOwner();if(!who){flash('먼저 내 이름을 입력하고 저장해주세요');return}const n=$('nameInput')?.value.trim()||'';const c=+$('countInput')?.value||1;if(!n){flash('참가 닉네임을 입력해주세요');return}api('addParticipant',{name:n,count:c,owner:who}).then(()=>{if($('nameInput'))$('nameInput').value='';flash('현재 선택한 핀볼에 등록 완료')}).catch(e=>flash(e.message||'등록 오류'))};
+ const addBulk=()=>{const who=currentOwner();if(!who){flash('먼저 내 이름을 입력하고 저장해주세요');return}const items=parseBulk($('bulkInput')?.value||'');if(!items.length){flash('일괄 추가할 참가자를 입력해주세요');return}api('bulkAdd',{items,owner:who}).then(()=>{if($('bulkInput'))$('bulkInput').value='';flash(`${items.length}명 일괄 추가 완료`)}).catch(e=>flash(e.message||'일괄 추가 오류'))};
  if($('addBtn'))$('addBtn').onclick=addOne;
  if($('bulkBtn'))$('bulkBtn').onclick=addBulk;
  const nameEl=$('nameInput');if(nameEl)nameEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addOne()}});

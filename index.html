@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>얌얌랜드 마블 핀볼 LIVE</title><link rel="stylesheet" href="styles.css?v=19200"></head>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>얌얌랜드 마블 핀볼 LIVE</title><link rel="stylesheet" href="styles.css?v=17050"></head>
 <body class="unified"><header><b id="brand">얌얌랜드 마블 핀볼</b><span><b id="roomDisplayName">단체 핀볼</b> · <i id="conn">연결 중</i></span></header>
 <nav class="roomTabs" aria-label="핀볼 화면 선택">
 <a data-room="GROUP" href="?room=GROUP">단체 핀볼</a>
@@ -11,12 +11,11 @@
 <section class="stage"><div class="statusBar"><span id="modeBadge">단체 핀볼</span><span id="winBadge">당첨: 첫 번째</span><span id="mapBadge">캔디 수레바퀴</span></div><canvas id="raceCanvas"></canvas><div class="miniMapWrap"><b>MINI MAP</b><canvas id="minimapCanvas"></canvas><span id="sectionLabel">출발 구간</span></div><aside><h3 aria-hidden="true"></h3><div id="rankList" aria-label="공 순서 목록"></div></aside><div id="counter">0 / 0</div><div id="winnerCard"><div class="winnerFlash" aria-hidden="true"></div><div class="winnerSparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="winnerCrown" aria-hidden="true"></div><small>WINNER</small><strong id="winnerNames"></strong></div></section>
 <section class="unifiedBottom panel">
   <div id="adminPanel" class="adminGrid">
-    <div class="group inputGroup combinedJoinGroup">
-      <div class="ownerSaveRow"><input id="ownerInput" list="ownerNames" autocomplete="off" placeholder="추가자 이름"><datalist id="ownerNames"><option value="야미"><option value="꿀혜"><option value="선하"><option value="도릿"></datalist><button id="saveOwner" type="button">이름 저장</button><span id="ownerSavedBadge" class="ownerSavedBadge">미지정 (?)</span></div>
-      <div class="singleAddRow"><input id="nameInput" placeholder="참가 닉네임"><input id="countInput" type="number" min="1" max="5000" value="1"><button id="addBtn" type="button">한 명 추가</button></div>
-      <textarea id="bulkInput" placeholder="단체 일괄 추가: 한 줄에 이름과 공 개수&#10;예) 호이 20&#10;미떼 15"></textarea>
-      <div class="bulkActionRow"><button id="bulkBtn" type="button">일괄 추가</button><button id="shuffleBtn" class="shuffle" type="button">🎲 공 배치 섞기</button></div>
-      <small class="ownerHint">이름을 저장하지 않고 추가하면 공에 <b>?</b>가 표시됩니다.</small>
+    <div class="group inputGroup mergedEntryGroup">
+      <b class="cardTitle">참가자 입력</b>
+      <input id="ownerInput" placeholder="내 이름"><button id="saveOwner" type="button">이름 저장</button>
+      <input id="nameInput" placeholder="참가 닉네임"><input id="countInput" type="number" min="1" max="5000" value="1"><button id="addBtn" type="button">한 명 추가</button>
+      <textarea id="bulkInput" placeholder="여러 명을 쉼표나 엔터로 구분"></textarea><button id="bulkBtn" type="button">일괄 추가</button><button id="shuffleBtn" class="shuffle" type="button">🎲 공 배치 섞기</button>
     </div>
     <div class="group win"><b>당첨 기준</b><label class="winChoice"><input type="radio" name="win" value="first"> 첫 번째</label><label class="winChoice"><input type="radio" name="win" value="last"> 마지막</label><label class="winChoice"><input type="radio" name="win" value="number"> 숫자 선택</label><input id="rankNumber" value="3" placeholder="예: 3 또는 1,5,10"><button id="applyWin">적용</button><span id="winSaved">설정 저장 전</span></div>
     <div class="group actionGroup"><select id="mapSelect"><option value="wheel">🍭 캔디 수레바퀴</option><option value="greed">🏺 욕망의 항아리 REMIX</option></select><button id="startBtn" class="primary">▶ 레이스 시작</button><button id="resetBtn">경기 초기화</button><button id="clearBtn" class="danger">참가자 전체 삭제</button><b>총 <span id="ballCount">0</span>공</b><small id="memberLink"></small></div>
@@ -24,7 +23,7 @@
   <div class="participantBoard"><div class="participantBoardTitle"><b>현재 참가자</b><strong id="participantSummary">0명 · 총 0공</strong></div><div class="list participantList" id="participants"></div></div>
   <small id="msg"></small>
 </section>
-</main><script src="app.js?v=19200"></script><script>
+</main><script src="app.js?v=17050"></script><script>
 (()=>{
  const params=new URLSearchParams(location.search);
  const room=(params.get('room')||'GROUP').toUpperCase();
