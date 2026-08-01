@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v))
 const ADMIN_PREFS_KEY='yamyam_pinball_admin_prefs_'+room;
 // 모든 맵이 공유하는 기본 핀볼 연출 설정. 맵을 바꾸거나 경기를 초기화해도 이 값은 사라지지 않는다.
 const GLOBAL_PINBALL_EFFECTS=Object.freeze({
- winnerCloseupMs:700,
+ winnerCloseupMs:1500,
  winnerHideAfterCloseup:true,
  winnerPopupPersistent:true,
  winnerReturnToMain:true,
@@ -1478,7 +1478,7 @@ function step(dt){
    sim.finishFocusUntil=now+(isWinner&&!preResolvedLastWinner?2200:1200);
    if(isWinner&&!preResolvedLastWinner){
     // 일반 당첨 모드는 기존처럼 당첨 공 클로즈업 후 팝업을 표시한다.
-    const winnerCloseupMs=700;
+    const winnerCloseupMs=1500;
     b.finishVisualUntil=now+5200;
     delete b.winnerHideAt;
     sim.winnerResolved=true;sim.winnerResolvedAt=now;sim.winnerPopupReady=false;sim.winnerPopupReadyAt=0;sim.winnerPopupNotBefore=now+winnerCloseupMs;
@@ -1556,7 +1556,7 @@ function sendSnapshot(){
  if(!sim||resetInFlight||mutationBusy)return;
  const activeSim=sim;
  const active=activeSim.balls.filter(b=>!b.done||String(b.ballId)===String(activeSim.focusBallId||''));
- const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),sentAt:Date.now()}};
+ const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),focusBallId:String(activeSim.focusBallId||''),focusRemainingMs:Math.max(0,Math.round(Number(activeSim.finishZoomUntil||0)-performance.now())),winnerResolved:!!activeSim.winnerResolved,sentAt:Date.now()}};
  if(snapshotSocketReady&&snapshotSocket?.readyState===WebSocket.OPEN){
   // 브라우저 송신 큐가 밀리면 오래된 프레임을 더 쌓지 않는다.
   if(snapshotSocket.bufferedAmount<180000){try{snapshotSocket.send(JSON.stringify(payload));return}catch{}}
@@ -1708,9 +1708,12 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(r
   }
  }
  const bottomCameraLocked=!!(role==='admin'&&sim?.bottomCameraLocked);
- const focusWinnerBall=(role==='admin'&&sim?.focusBallId)?active.find(b=>String(b.ballId)===String(sim.focusBallId)):null;
+ const liveSnapshot=(renderRemoteSnapshot||state?.snapshot)||{};
+ const syncedFocusId=role==='admin'?String(sim?.focusBallId||''):String(liveSnapshot.focusBallId||'');
+ const focusWinnerBall=syncedFocusId?active.find(b=>String(b.ballId)===syncedFocusId):null;
  const greedCameraCandidate=map.type==='greed'?pickGreedCameraCandidate(active,map):null;
- const winnerCinematic=!!(focusWinnerBall&&(performance.now()<sim.finishZoomUntil||(sim.winnerResolved&&focusWinnerBall.qualified&&!focusWinnerBall.done)));
+ const remoteFocusActive=role!=='admin'&&!!focusWinnerBall&&(Number(liveSnapshot.focusRemainingMs||0)>0||!!liveSnapshot.winnerResolved)&&!focusWinnerBall.done;
+ const winnerCinematic=!!(focusWinnerBall&&(role==='admin'?(performance.now()<sim.finishZoomUntil||(sim.winnerResolved&&focusWinnerBall.qualified&&!focusWinnerBall.done)):remoteFocusActive));
  const stops=map.cameraStops||[];let bestStop=null,bestScore=-1;
  const nowCam=performance.now();
  const startBaseAt=(sim?.startReleaseAt||sim?.startedAt||nowCam);
@@ -1975,7 +1978,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(r
  const baseScale=renderBaseScale,sx=baseScale*zoom,viewCenter=w/2,ox=viewCenter-camX*sx;
  x.save();x.translate(ox,-cam*sx);x.scale(sx,sx);drawMap(x,map,theme);map.rot.forEach((r,i)=>{const a=role==='admin'&&sim?r.a:(state?.snapshot?.rot?.[i]||0),co=Math.cos(a),si=Math.sin(a);x.strokeStyle=theme.line;x.shadowColor=theme.glow;x.shadowBlur=18;x.lineWidth=16;x.beginPath();x.moveTo(r.x-co*r.len/2,r.y-si*r.len/2);x.lineTo(r.x+co*r.len/2,r.y+si*r.len/2);x.stroke();x.shadowBlur=0});if(map.gate){const a=role==='admin'&&sim?map.gate.a:Number(state?.snapshot?.gate||0),co=Math.cos(a),si=Math.sin(a),half=map.gate.len/2;x.save();x.strokeStyle=theme.line;x.shadowColor=theme.glow;x.shadowBlur=22;x.lineWidth=18;x.lineCap='round';x.beginPath();x.moveTo(map.gate.pivotX-co*half,map.gate.pivotY-si*half);x.lineTo(map.gate.pivotX+co*half,map.gate.pivotY+si*half);x.stroke();x.fillStyle='#fff';x.beginPath();x.arc(map.gate.pivotX,map.gate.pivotY,11,0,Math.PI*2);x.fill();x.restore()}
  // 원본 SkillEffect: 0.5초 동안 반경 10 월드 단위로 퍼지는 원형 충격파.
- for(const b of source){if(b.done)continue;const alpha=(role==='admin'&&sim)?clamp(sim.acc/8.333,0,1):1,rx=(role==='admin'&&sim&&Number.isFinite(b.prevX))?b.prevX+(b.x-b.prevX)*alpha:b.x,ry=(role==='admin'&&sim&&Number.isFinite(b.prevY))?b.prevY+(b.y-b.prevY)*alpha:b.y;const hideAtWinnerEnd=!!(role==='admin'&&sim?.winnerResolved&&String(sim.focusBallId)===String(b.ballId)&&Number.isFinite(Number(b.winnerHideAt))&&performance.now()>=Number(b.winnerHideAt));if(hideAtWinnerEnd)continue;const focusStillLive=!!(role==='admin'&&sim?.focusBallId&&String(sim.focusBallId)===String(b.ballId)&&(performance.now()<sim.finishZoomUntil||(sim.winnerResolved&&b.qualified&&!b.done))),isFocusBall=focusStillLive,cinematicActive=!!(role==='admin'&&sim?.focusBallId&&(performance.now()<sim.finishZoomUntil||(sim.winnerResolved&&focusWinnerBall&&!focusWinnerBall.done)));x.save();if(cinematicActive&&!isFocusBall)x.globalAlpha=.18;const pulse=isFocusBall?(1.48+Math.sin(performance.now()*.010)*.08):1,visualR=(b.r||R)*pulse;const hue=getNameHue(b.name),impactMs=role==='admin'&&sim?Math.max(0,Number(b.impactUntil||0)-performance.now()):Math.max(0,Number(b.impactMs||0)),impactLight=70+25*Math.min(1,impactMs/500);x.shadowColor=getNameColor(b.name,.95);x.shadowBlur=isFocusBall?22:(denseMode?0:10);x.fillStyle=`hsl(${hue} 86% ${Math.min(86,impactLight)}%)`;x.beginPath();x.arc(rx,ry,visualR,0,7);x.fill();x.lineWidth=isFocusBall?3:2;x.strokeStyle='#fff';x.stroke();x.shadowBlur=0;
+ for(const b of source){if(b.done)continue;const alpha=(role==='admin'&&sim)?clamp(sim.acc/8.333,0,1):1,rx=(role==='admin'&&sim&&Number.isFinite(b.prevX))?b.prevX+(b.x-b.prevX)*alpha:b.x,ry=(role==='admin'&&sim&&Number.isFinite(b.prevY))?b.prevY+(b.y-b.prevY)*alpha:b.y;const hideAtWinnerEnd=!!(role==='admin'&&sim?.winnerResolved&&String(sim.focusBallId)===String(b.ballId)&&Number.isFinite(Number(b.winnerHideAt))&&performance.now()>=Number(b.winnerHideAt));if(hideAtWinnerEnd)continue;const focusStillLive=!!(winnerCinematic&&syncedFocusId&&String(syncedFocusId)===String(b.ballId)),isFocusBall=focusStillLive,cinematicActive=winnerCinematic;x.save();if(cinematicActive&&!isFocusBall)x.globalAlpha=.18;const pulse=isFocusBall?(1.62+Math.sin(performance.now()*.012)*.10):1,visualR=(b.r||R)*pulse;const hue=getNameHue(b.name),impactMs=role==='admin'&&sim?Math.max(0,Number(b.impactUntil||0)-performance.now()):Math.max(0,Number(b.impactMs||0)),impactLight=70+25*Math.min(1,impactMs/500);x.shadowColor=getNameColor(b.name,.95);x.shadowBlur=isFocusBall?34:(denseMode?0:10);x.fillStyle=`hsl(${hue} 86% ${Math.min(86,impactLight)}%)`;x.beginPath();x.arc(rx,ry,visualR,0,7);x.fill();x.lineWidth=isFocusBall?3:2;x.strokeStyle='#fff';x.stroke();x.shadowBlur=0;
   if(['GROUP','YAMYAM'].includes(String(room||'').toUpperCase())){const mark=String(b.ownerInitial||ownerMark(b.owner)||'?').slice(0,1);if(mark){x.textAlign='center';x.textBaseline='middle';x.font=`1000 ${Math.max(11,Math.round(visualR*1.05))}px Pretendard, Arial, sans-serif`;x.lineWidth=2.5;x.strokeStyle='rgba(0,0,0,.78)';x.strokeText(mark,rx,ry+1);x.fillStyle='#fff';x.fillText(mark,rx,ry+1)}}
   // 공이 많아져도 이름은 숨기지 않는다. 밀집 상태에서는 글자만 작게 줄여 프레임과 가독성을 함께 유지한다.
   {
@@ -1999,12 +2002,18 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(r
  x.restore();
  }x.restore();
  // 첫 번째 당첨 후보는 결승 진입 직전에도 다른 공 위에 한 번 더 그려 겹침 없이 식별되게 한다.
- if(role==='admin'&&sim?.firstWinnerPreview&&focusWinnerBall&&performance.now()<sim.finishZoomUntil){
-  const a=clamp(sim.acc/8.333,0,1),wx=focusWinnerBall.prevX+(focusWinnerBall.x-focusWinnerBall.prevX)*a,wy=focusWinnerBall.prevY+(focusWinnerBall.y-focusWinnerBall.prevY)*a;
-  const px=ox+wx*sx,py=(wy-cam)*sx,rr=(focusWinnerBall.r||R)*sx*2.05;
-  x.save();x.textAlign='center';x.textBaseline='middle';x.shadowColor=getNameColor(focusWinnerBall.name,.98);x.shadowBlur=34;
-  x.fillStyle=getNameColor(focusWinnerBall.name,1);x.beginPath();x.arc(px,py,rr,0,Math.PI*2);x.fill();x.lineWidth=4;x.strokeStyle='#fff';x.stroke();x.shadowBlur=0;
-  x.font='1000 28px Pretendard, "Noto Sans KR", Arial, sans-serif';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.90)';x.strokeText(String(focusWinnerBall.name||'').slice(0,10),px,py+rr+25);x.fillStyle='#fff';x.fillText(String(focusWinnerBall.name||'').slice(0,10),px,py+rr+25);x.restore();
+ if(winnerCinematic&&focusWinnerBall){
+  const a=(role==='admin'&&sim)?clamp(sim.acc/8.333,0,1):1;
+  const wx=(role==='admin'&&Number.isFinite(focusWinnerBall.prevX))?focusWinnerBall.prevX+(focusWinnerBall.x-focusWinnerBall.prevX)*a:focusWinnerBall.x;
+  const wy=(role==='admin'&&Number.isFinite(focusWinnerBall.prevY))?focusWinnerBall.prevY+(focusWinnerBall.y-focusWinnerBall.prevY)*a:focusWinnerBall.y;
+  const px=ox+wx*sx,py=(wy-cam)*sx,beat=.5+.5*Math.sin(performance.now()*.012),rr=(focusWinnerBall.r||R)*sx*(2.08+beat*.12);
+  x.save();
+  const vignette=x.createRadialGradient(px,py,rr*.35,px,py,Math.max(w,h)*.72);vignette.addColorStop(0,'rgba(0,0,0,0)');vignette.addColorStop(.24,'rgba(0,0,0,.08)');vignette.addColorStop(1,'rgba(0,0,0,.58)');x.fillStyle=vignette;x.fillRect(0,0,w,h);
+  x.textAlign='center';x.textBaseline='middle';x.shadowColor=getNameColor(focusWinnerBall.name,.98);x.shadowBlur=42;
+  x.fillStyle=getNameColor(focusWinnerBall.name,1);x.beginPath();x.arc(px,py,rr,0,Math.PI*2);x.fill();x.lineWidth=5;x.strokeStyle='#fff';x.stroke();
+  x.globalAlpha=.72;x.lineWidth=3;x.beginPath();x.arc(px,py,rr+10+beat*8,0,Math.PI*2);x.stroke();x.globalAlpha=1;x.shadowBlur=0;
+  if(['GROUP','YAMYAM'].includes(String(room||'').toUpperCase())){const mark=String(focusWinnerBall.ownerInitial||ownerMark(focusWinnerBall.owner)||'?').slice(0,1);x.font='1000 26px Pretendard, Arial, sans-serif';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.82)';x.strokeText(mark,px,py+1);x.fillStyle='#fff';x.fillText(mark,px,py+1)}
+  x.font='1000 28px Pretendard, "Noto Sans KR", Arial, sans-serif';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.90)';x.strokeText(String(focusWinnerBall.name||'').slice(0,10),px,py+rr+27);x.fillStyle='#fff';x.fillText(String(focusWinnerBall.name||'').slice(0,10),px,py+rr+27);x.restore();
  }
  if(role==='admin'&&sim?.finishFlash&&performance.now()>=sim.finishFlash.startAt&&performance.now()<sim.finishFlash.until){
   const f=sim.finishFlash,nowFx=performance.now();
