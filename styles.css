@@ -1,0 +1,779 @@
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Pretendard,"Noto Sans KR",Arial,sans-serif;background:#050712;color:#fff;overflow:hidden}header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#0b1020;border-bottom:1px solid #28314a}header i{color:#65f6aa;font-style:normal}main{height:calc(100% - 58px)}.display main{height:100%}.display header{display:none}.stage{position:relative;width:100%;height:calc(100% - 210px);min-height:460px;overflow:hidden}.display .stage{height:100%}.member .stage{height:calc(100% - 190px)}#raceCanvas{width:100%;height:100%;display:block}.statusBar{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:4;display:flex;gap:8px}.statusBar span{padding:8px 14px;border-radius:999px;background:rgba(8,12,25,.78);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);font-weight:800}.statusBar .solo{background:rgba(95,92,255,.88)}.statusBar .group{background:rgba(255,91,153,.88)}aside{position:absolute;right:14px;top:70px;width:260px;height:68%;background:rgba(7,10,22,.78);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:12px 8px 10px 12px;backdrop-filter:blur(10px);z-index:4;overflow:hidden}aside h3{margin:0 0 8px;padding:0 4px 8px 55px;font-size:14px;color:#eef4ff;border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap}#rankList{height:calc(100% - 34px);overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;overscroll-behavior:contain;padding-right:2px;scrollbar-width:none;-ms-overflow-style:none}.rankItem{display:grid;grid-template-columns:34px 12px minmax(0,1fr) 42px;gap:6px;align-items:center;min-height:31px;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.055);border-left:3px solid var(--rainbow);background:linear-gradient(90deg,var(--rainbowSoft),transparent 72%);animation:rankIn .25s ease}.rankNo{font-weight:1000;color:var(--rainbow);font-size:15px;text-align:right;text-shadow:0 0 8px color-mix(in srgb,var(--rainbow) 60%,transparent)}.rankName{font-weight:900;color:var(--rainbow);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rankCopy{font-size:10px;color:#c4cee8;text-align:right;white-space:nowrap}.colorDot{width:11px;height:11px;border-radius:50%;background:var(--dot);box-shadow:0 0 8px var(--dot)}#counter{position:absolute;right:22px;bottom:18px;z-index:4;font-size:28px;font-weight:900;text-shadow:0 2px 10px #000}.miniMapWrap{position:absolute;left:14px;top:70px;width:145px;height:56%;padding:8px;background:rgba(5,8,18,.78);border:1px solid rgba(255,255,255,.2);border-radius:15px;z-index:5;display:flex;flex-direction:column;gap:6px}.miniMapWrap b{font-size:12px;letter-spacing:1px}.miniMapWrap canvas{width:100%;height:calc(100% - 38px);border-radius:8px}.miniMapWrap span{font-size:11px;color:#ffe36c;text-align:center}.panel{height:210px;background:#0d1223;border-top:1px solid #2b3552;display:grid;grid-template-columns:1.05fr 1.6fr 1.4fr 1.2fr;gap:8px;padding:10px;overflow:auto}.memberPanel{height:190px;grid-template-columns:.7fr 1.6fr 1fr}.group{background:#11182d;border:1px solid #2b3552;border-radius:12px;padding:9px;display:flex;gap:7px;align-items:center;align-content:flex-start;flex-wrap:wrap}.inputGroup{align-items:stretch}.group input,.group textarea,.group select{background:#090e1e;color:#fff;border:1px solid #344062;border-radius:9px;padding:9px;outline:none}.group textarea{width:100%;height:55px;resize:none}.group button{border:1px solid #5267ad;background:#23315d;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.group button:hover{filter:brightness(1.15)}button.selected,.winChoice.selected{background:#735cff!important;border-color:#a89aff!important;box-shadow:0 0 0 2px rgba(143,121,255,.25)}.primary{background:#7057ff!important}.danger{background:#b52e5e!important}.shuffle{background:#ff9f2f!important;color:#1b0d00!important}.win{display:grid;grid-template-columns:auto 1fr 1fr 1fr;align-items:center}.winChoice{display:flex;gap:5px;align-items:center;padding:8px;border:1px solid #39466c;border-radius:9px;cursor:pointer}.winChoice input{accent-color:#7b61ff}.win #rankNumber{grid-column:1/4}.win #applyWin{grid-column:4}.win #winSaved{grid-column:1/5;font-size:12px;color:#7fffc0}.list{background:#0c1224;border:1px solid #293452;border-radius:10px;overflow:auto;max-height:170px}.pitem{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid #252e48}.pitem b{flex:1}.pill{font-size:12px;color:#b9c5e8}.miniBtn{background:#a72d57;color:white;border:0;border-radius:7px;padding:5px 8px}#winnerCard{position:absolute;left:50%;bottom:42px;transform:translateX(-50%) translateY(20px);z-index:10;min-width:330px;padding:18px 28px;border-radius:24px;text-align:center;background:linear-gradient(135deg,rgba(255,247,177,.96),rgba(255,168,218,.96));color:#281133;border:3px solid #fff5aa;box-shadow:0 0 35px rgba(255,231,111,.75);opacity:0;pointer-events:none;transition:.5s ease}#winnerCard.show{opacity:1;transform:translateX(-50%) translateY(0)}#winnerCard small{display:block;font-size:18px;font-weight:1000;letter-spacing:4px}#winnerCard strong{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:29px}#winnerCard strong span{display:flex;gap:6px;align-items:center}#winnerCard em{font-size:13px;background:#4c235c;color:white;border-radius:999px;padding:4px 7px;font-style:normal}#winnerCard.burst:before,#winnerCard.burst:after{content:"✦ ✧ ✦ ✧ ✦";position:absolute;left:50%;top:50%;font-size:28px;color:#fff6a9;animation:burst 1.2s ease-out forwards}#winnerCard.burst:after{animation-delay:.12s;transform:rotate(45deg)}@keyframes burst{0%{transform:translate(-50%,-50%) scale(.3);opacity:1}100%{transform:translate(-50%,-50%) scale(4);opacity:0}}@keyframes rankIn{from{opacity:0;transform:translateX(15px)}to{opacity:1;transform:none}}@media(max-width:900px){.panel{grid-template-columns:1fr;height:44%;}.stage{height:56%}.miniMapWrap{width:100px}aside{width:175px}#winnerCard{min-width:270px}.statusBar{left:12px;transform:none;flex-wrap:wrap}.statusBar span{font-size:11px;padding:6px 9px}}
+.rankItem.live{background:linear-gradient(90deg,var(--rainbowSoft),rgba(105,220,255,.055),transparent 78%)}
+.rankItem.preview{background:linear-gradient(90deg,var(--rainbowSoft),rgba(255,255,255,.018),transparent 78%)}
+.rankState{font-size:10px;color:#dce5ff;opacity:.7;white-space:nowrap;text-align:right}
+
+#raceCanvas{background:radial-gradient(circle at 50% 15%,rgba(255,255,255,.06),transparent 35%)}
+.rankItem.preview{border-left-color:var(--rainbow)}
+#shuffleBtn{box-shadow:0 0 0 2px rgba(255,180,70,.18)}
+
+#rankList::-webkit-scrollbar{display:none;width:0;height:0}
+
+/* v4.5 안정화: 오른쪽 목록을 맵 위 HUD처럼 표시 */
+aside{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  padding:0!important;
+  overflow:visible!important;
+  width:260px!important;
+  right:20px!important;
+  top:86px!important;
+  height:70%!important;
+  pointer-events:auto;
+}
+aside h3{
+  border:0!important;
+  background:transparent!important;
+  padding:0 2px 7px!important;
+  margin:0!important;
+  color:#fff!important;
+  text-shadow:0 2px 5px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.85);
+  font-size:14px!important;
+}
+#rankList{
+  height:calc(100% - 27px)!important;
+  padding:0!important;
+  contain:layout paint style;
+  will-change:scroll-position;
+  scroll-behavior:auto!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%);
+}
+.rankItem{
+  min-height:28px!important;
+  padding:3px 2px!important;
+  border:0!important;
+  background:transparent!important;
+  animation:none!important;
+  opacity:1!important;
+  filter:none!important;
+  transform:none!important;
+  text-shadow:0 2px 4px rgba(0,0,0,.98),0 0 7px rgba(0,0,0,.85);
+  transition:color .12s linear,opacity .12s linear;
+  contain:layout style;
+}
+.rankItem.newArrival{animation:arrivalPulse .45s ease-out!important}
+.rankNo,.rankName{color:var(--rainbow)!important;text-shadow:0 2px 4px #000,0 0 6px color-mix(in srgb,var(--rainbow) 45%,transparent)!important}
+.rankCopy,.rankState{color:rgba(255,255,255,.9)!important;text-shadow:0 2px 4px #000!important;opacity:1!important}
+.colorDot{box-shadow:0 0 5px var(--dot)!important}
+@keyframes arrivalPulse{0%{transform:translateX(7px);opacity:.35}100%{transform:none;opacity:1}}
+
+.rankItem{font-variant-numeric:tabular-nums}.rankCopy{font-size:12px;font-weight:900;color:var(--rainbow);text-align:right}.rankItem.live .rankNo:after{content:"위";font-size:9px;margin-left:1px}.rankItem.preview .rankNo:after{content:"번";font-size:9px;margin-left:1px}.rankItem:not(.live):not(.preview) .rankNo:after{content:"위";font-size:9px;margin-left:1px}
+
+/* v5.0 결승 연출 및 결과 가독성 */
+aside h3{display:none!important}
+#rankList{height:100%!important;-webkit-mask-image:none!important;mask-image:none!important}
+.rankItem{grid-template-columns:42px 14px minmax(0,1fr) 54px!important;min-height:35px!important;padding:5px 2px!important}
+.rankNo{font-size:19px!important}
+.rankName{font-size:18px!important}
+.rankCopy{font-size:15px!important}
+#counter{font-size:31px!important}
+#winnerCard{left:50%!important;top:50%!important;bottom:auto!important;transform:translate(-50%,-50%) scale(.94)!important;min-width:390px!important;padding:24px 34px!important}
+#winnerCard.show{transform:translate(-50%,-50%) scale(1)!important}
+#winnerCard small{font-size:20px!important}
+#winnerCard strong{font-size:34px!important}
+
+.personTotal{opacity:.72;font-size:12px;margin-left:auto;white-space:nowrap}.pitem .pill strong{font-size:15px}.pitem{gap:8px}
+
+
+/* v5.7 참가자 공 개수 강조 */
+.admin .panel{height:286px;grid-template-columns:1.05fr 1.6fr 1.4fr 1.2fr;grid-template-rows:auto 112px;overflow:hidden}
+.admin .stage{height:calc(100% - 286px)}
+.participantBoard{grid-column:1/-1;display:flex;flex-direction:column;min-height:108px;border:2px solid #7765ff;border-radius:14px;background:linear-gradient(135deg,rgba(71,53,149,.38),rgba(11,18,39,.96));box-shadow:0 0 20px rgba(118,96,255,.22);overflow:hidden}
+.participantBoardTitle{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(115,92,255,.24);border-bottom:1px solid rgba(255,255,255,.16)}
+.participantBoardTitle b{font-size:16px;color:#fff}.participantBoardTitle strong{font-size:15px;color:#ffe977}
+.participantList{max-height:none!important;flex:1!important;border:0!important;border-radius:0!important;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-content:start;gap:6px;padding:7px;overflow-y:auto!important;background:transparent!important}
+.participantList .pitem{min-height:55px;padding:7px 10px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(5,9,22,.72);gap:9px}
+.participantList .pitem b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.personRank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#30275c;color:#dcd6ff;font-size:12px;font-weight:900}
+.personBallCount{min-width:70px;display:flex;align-items:baseline;justify-content:center;gap:3px;color:#ffe66b;text-shadow:0 0 10px rgba(255,223,80,.42)}
+.personBallCount strong{font-size:25px;line-height:1}.personBallCount small{font-size:13px;font-weight:900}.emptyParticipants{grid-column:1/-1;text-align:center;padding:18px;color:#9da8c7}
+.personTotal,.pitem .pill{display:none!important}
+@media(max-width:900px){.admin .panel{height:44%;grid-template-rows:auto 120px}.admin .stage{height:56%}.participantList{grid-template-columns:1fr}}
+.rankItem.winnerArrival{background:rgba(255,235,115,.2);box-shadow:inset 0 0 0 2px #ffe56f,0 0 18px rgba(255,229,111,.55);animation:winnerRowPulse .8s ease-in-out 3}
+@keyframes winnerRowPulse{50%{transform:scale(1.025);filter:brightness(1.35)}}
+
+/* v6.0 참가자별 공 개수 안전 조정 */
+.ballAdjust{display:flex;align-items:center;gap:6px;margin-left:auto;white-space:nowrap}
+.ballAdjust button{height:32px;border:1px solid #6476bd;border-radius:8px;background:#25345f;color:#fff;font-weight:900;cursor:pointer}
+.ballAdjust .countMinus,.ballAdjust .countPlus{width:34px;padding:0;font-size:20px;line-height:1}
+.ballAdjust .countSet{padding:0 10px;font-size:12px;background:#594ac4}
+.ballAdjust button:hover{filter:brightness(1.18)}
+.participantList .personBallCount{min-width:58px}
+@media(max-width:700px){.participantList .pitem{flex-wrap:wrap}.ballAdjust{width:100%;justify-content:flex-end}.ballAdjust .countSet{flex:1;max-width:110px}}
+
+/* v6.5 관리자 하단 참가자 목록 가시성 개선 */
+html,body.admin{overflow-y:auto!important;overflow-x:hidden!important}
+.admin main{height:auto!important;min-height:calc(100vh - 58px)!important}
+.admin .stage{height:calc(100vh - 58px - 235px)!important;min-height:460px!important}
+.admin .panel{
+  height:auto!important;
+  min-height:430px!important;
+  grid-template-rows:auto minmax(230px,auto)!important;
+  overflow:visible!important;
+  padding-bottom:18px!important;
+}
+.admin .participantBoard{min-height:230px!important;max-height:360px!important}
+.admin .participantList{min-height:190px!important;max-height:320px!important;overflow-y:auto!important;scrollbar-width:thin!important}
+.admin .participantList::-webkit-scrollbar{width:10px}
+.admin .participantList::-webkit-scrollbar-thumb{background:#6557c7;border-radius:999px;border:2px solid #171d35}
+.admin .participantList::-webkit-scrollbar-track{background:#10162a}
+@media(max-height:800px){
+  .admin .stage{height:500px!important}
+  .admin .panel{min-height:410px!important}
+}
+
+/* v8.2 - 오른쪽 순위 목록을 화면 세로 공간에 꽉 채움 */
+.display aside,
+.member aside,
+.admin aside{
+  top:48px!important;
+  bottom:8px!important;
+  height:auto!important;
+  padding:5px 7px 5px 8px!important;
+  border-radius:10px!important;
+}
+aside h3{
+  display:none!important;
+}
+#rankList{
+  height:100%!important;
+  padding:0!important;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  gap:0;
+}
+.rankItem{
+  grid-template-columns:32px 10px minmax(0,1fr) 40px!important;
+  gap:5px!important;
+  min-height:20px!important;
+  height:20px;
+  padding:0 3px!important;
+  border-bottom:0!important;
+  line-height:20px!important;
+}
+.rankNo{
+  font-size:16px!important;
+  line-height:20px!important;
+}
+.rankName{
+  font-size:16px!important;
+  line-height:20px!important;
+}
+.rankCopy{
+  font-size:12px!important;
+  line-height:20px!important;
+}
+.colorDot{
+  width:8px!important;
+  height:8px!important;
+}
+#counter{
+  top:10px!important;
+  right:20px!important;
+  bottom:auto!important;
+  font-size:20px!important;
+  z-index:6!important;
+}
+@media(max-height:760px){
+  .rankItem{min-height:17px!important;height:17px;line-height:17px!important}
+  .rankNo,.rankName{font-size:14px!important;line-height:17px!important}
+  .rankCopy{font-size:10px!important;line-height:17px!important}
+  .display aside,.member aside,.admin aside{top:40px!important;bottom:4px!important}
+}
+
+/* v8.3 - 순위 이름/번호 가독성 및 결승 사다리꼴 구조 대응 */
+.display aside,.member aside,.admin aside{
+  width:270px!important;
+  right:8px!important;
+  overflow:visible!important;
+}
+#rankList{
+  overflow-y:auto!important;
+  overflow-x:visible!important;
+  contain:none!important;
+  mask-image:none!important;
+  -webkit-mask-image:none!important;
+}
+.rankItem{
+  grid-template-columns:34px 11px minmax(74px,118px) 40px!important;
+  column-gap:4px!important;
+  min-height:23px!important;
+  height:23px!important;
+  line-height:23px!important;
+  padding:0 4px!important;
+  overflow:visible!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+.rankNo,.rankName,.rankCopy{
+  opacity:1!important;
+  visibility:visible!important;
+  line-height:23px!important;
+}
+.rankNo{font-size:18px!important}
+.rankName{
+  font-size:18px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  min-width:0!important;
+}
+.rankCopy{
+  font-size:15px!important;
+  width:40px!important;
+  justify-self:end!important;
+  text-align:right!important;
+  margin-left:0!important;
+}
+.colorDot{width:9px!important;height:9px!important}
+@media(max-height:760px){
+  .rankItem{min-height:20px!important;height:20px!important;line-height:20px!important}
+  .rankNo,.rankName{font-size:16px!important;line-height:20px!important}
+  .rankCopy{font-size:13px!important;line-height:20px!important}
+}
+
+/* v9.3 - 공 번호 누락 방지 및 이름-번호 간격 정돈 */
+.rankItem{grid-template-columns:34px 11px minmax(78px,128px) 34px!important;column-gap:3px!important}
+.rankCopy{width:34px!important;min-width:34px!important;font-size:15px!important;color:var(--rainbow)!important;opacity:1!important;visibility:visible!important}
+
+/* v10.0: 미니맵을 왼쪽에 더 크고 또렷하게 고정 */
+.miniMapWrap{left:12px!important;top:66px!important;width:168px!important;height:62%!important;padding:10px!important;background:rgba(3,7,15,.92)!important;border-color:rgba(255,255,255,.28)!important;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.miniMapWrap canvas{background:#02050b;border:1px solid rgba(255,255,255,.1)}
+
+
+/* v11.1: 순위 1위 상단 고정 + 순위변동 부드러운 슬라이드 */
+#rankList{scroll-behavior:smooth!important;overflow-anchor:none!important;}
+.rankItem{will-change:transform;transition:transform 520ms cubic-bezier(.22,.75,.25,1),background-color .25s ease,border-color .25s ease!important;}
+
+/* v11.3 공 이름 및 결승 입장 순서표 */
+aside{width:286px!important;padding:10px 8px 10px 8px!important}
+aside h3{padding-left:8px!important;text-align:left;font-size:15px!important}
+#rankList{scroll-behavior:smooth!important;padding-right:4px!important}
+.rankItem{grid-template-columns:18px 37px 12px minmax(78px,1fr) 42px!important;column-gap:4px!important;min-height:28px!important;height:28px!important;padding:2px 3px!important;border-left-width:2px!important}
+.rankCheck{font-size:17px;font-weight:1000;color:var(--rainbow);text-align:center;text-shadow:0 0 7px var(--rainbow),0 2px 3px #000}
+.rankNo{font-size:17px!important;line-height:24px!important;text-align:right!important}
+.rankName{font-size:17px!important;line-height:24px!important;font-weight:1000!important;text-shadow:0 2px 4px #000,0 0 5px rgba(0,0,0,.9)!important}
+.rankCopy{font-size:14px!important;line-height:24px!important;font-weight:1000!important}
+.rankItem.done{background:linear-gradient(90deg,var(--rainbowSoft),rgba(255,255,255,.035),transparent 82%)!important}
+.rankItem.live{opacity:.86}
+.rankItem.live .rankCheck{opacity:.18}
+
+/* v12.6 오른쪽 명단: 순위 숫자 제거, 체크/대기 표시 + 이름 + #공번호만 표시 */
+.rankItem{grid-template-columns:22px 12px minmax(78px,1fr) 48px!important;column-gap:5px!important;}
+.rankNo{display:none!important;}
+.rankCheck{font-size:18px!important;line-height:24px!important;font-weight:1000!important;text-align:center!important;}
+.rankItem.done .rankCheck{color:#62ff8b!important;text-shadow:0 0 8px rgba(98,255,139,.9),0 2px 3px #000!important;}
+.rankItem.live .rankCheck,.rankItem.preview .rankCheck{color:rgba(255,255,255,.48)!important;text-shadow:0 2px 3px #000!important;opacity:1!important;}
+.rankName{color:var(--rainbow)!important;}
+.rankCopy{color:#fff!important;text-shadow:0 2px 4px #000!important;font-weight:1000!important;}
+
+
+/* v14.77 참가자 카드 비율 정리: 이름 + 공 개수 + / - 한눈에 표시 */
+.admin .participantList{
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr))!important;
+  gap:8px!important;
+  padding:8px!important;
+}
+.admin .participantList .pitem{
+  display:flex!important;
+  align-items:center!important;
+  min-width:0!important;
+  min-height:48px!important;
+  padding:6px 9px!important;
+  gap:7px!important;
+}
+.admin .participantList .pitem b{
+  display:block!important;
+  flex:1 1 90px!important;
+  min-width:60px!important;
+  max-width:none!important;
+  font-size:15px!important;
+  line-height:1.2!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.admin .participantList .personRank{
+  flex:0 0 22px!important;
+  width:22px!important;
+  height:22px!important;
+  font-size:11px!important;
+}
+.admin .participantList .colorDot{
+  flex:0 0 9px!important;
+  width:9px!important;
+  height:9px!important;
+}
+.admin .participantList .ballAdjust{
+  flex:0 0 auto!important;
+  margin-left:4px!important;
+  gap:4px!important;
+}
+.admin .participantList .personBallCount{
+  min-width:48px!important;
+  gap:2px!important;
+}
+.admin .participantList .personBallCount strong{
+  font-size:18px!important;
+  line-height:1!important;
+}
+.admin .participantList .personBallCount small{
+  font-size:12px!important;
+}
+.admin .participantList .ballAdjust .countMinus,
+.admin .participantList .ballAdjust .countPlus{
+  width:28px!important;
+  height:28px!important;
+  font-size:17px!important;
+  border-radius:7px!important;
+}
+.admin .participantList .ballAdjust .countSet{
+  height:28px!important;
+  padding:0 7px!important;
+  font-size:11px!important;
+}
+@media (min-width:1500px){
+  .admin .participantList{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))!important}
+}
+@media (max-width:760px){
+  .admin .participantList{grid-template-columns:1fr!important}
+  .admin .participantList .pitem{flex-wrap:nowrap!important}
+  .admin .participantList .ballAdjust{width:auto!important}
+}
+
+
+/* v14.79 원본 사이트형 순위표: 체크 이름 #순위를 한 칸 간격으로 밀착 */
+aside{width:225px!important;padding:8px 6px!important}
+aside h3{display:none!important}
+#rankList{height:100%!important;padding:0 2px!important}
+.rankItem{
+  display:grid!important;
+  grid-template-columns:18px minmax(0,1fr) auto!important;
+  column-gap:4px!important;
+  align-items:center!important;
+  min-height:24px!important;
+  height:24px!important;
+  padding:0 4px!important;
+  border-left-width:0!important;
+  border-bottom:0!important;
+  background:transparent!important;
+  line-height:24px!important;
+}
+.rankCheck{
+  width:18px!important;
+  min-width:18px!important;
+  font-size:16px!important;
+  line-height:24px!important;
+  text-align:center!important;
+  margin:0!important;
+}
+.rankName{
+  min-width:0!important;
+  font-size:16px!important;
+  line-height:24px!important;
+  font-weight:900!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+.rankCopy{
+  width:auto!important;
+  min-width:0!important;
+  font-size:16px!important;
+  line-height:24px!important;
+  font-weight:900!important;
+  text-align:left!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+  color:var(--rainbow)!important;
+}
+.rankItem.done .rankCheck{color:#62ff8b!important}
+.rankItem.live .rankCheck,.rankItem.preview .rankCheck{color:rgba(255,255,255,.48)!important}
+.rankNo,.colorDot,.rankState{display:none!important}
+@media(max-width:900px){aside{width:190px!important}.rankName,.rankCopy{font-size:14px!important}.rankItem{grid-template-columns:16px minmax(0,1fr) auto!important;column-gap:3px!important}}
+
+/* v14.80 부드러운 원본형 레인보우 + 순위 이름/#번호 밀착 + 참가자 카드 동일색 */
+.rankItem{
+  display:flex!important;
+  align-items:center!important;
+  gap:4px!important;
+  min-height:24px!important;
+  height:24px!important;
+  padding:0 4px!important;
+}
+.rankCheck{
+  flex:0 0 18px!important;
+  width:18px!important;
+  margin:0!important;
+}
+.rankName{
+  flex:0 1 auto!important;
+  max-width:128px!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  color:var(--rainbow)!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.95)!important;
+}
+.rankCopy{
+  flex:0 0 auto!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0 0 0 1px!important;
+  color:var(--rainbow)!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.95)!important;
+}
+.admin .participantList .pitem{
+  border-color:color-mix(in srgb,var(--personColor) 28%,rgba(255,255,255,.12))!important;
+  background:linear-gradient(90deg,var(--personSoft),rgba(5,9,22,.78) 45%)!important;
+}
+.admin .participantList .pitem b,
+.admin .participantList .personBallCount strong,
+.admin .participantList .personBallCount small{
+  color:var(--personColor)!important;
+  text-shadow:0 1px 3px rgba(0,0,0,.9)!important;
+}
+.admin .participantList .colorDot{
+  background:var(--personColor)!important;
+  box-shadow:0 0 7px color-mix(in srgb,var(--personColor) 55%,transparent)!important;
+}
+@media(max-width:900px){
+  .rankName{max-width:105px!important}
+}
+
+
+/* v14.81 원본 사이트처럼 오른쪽 끝 밀착 + 임팩트 파동 제거 버전 */
+aside{
+  width:225px!important;
+  padding:6px 5px 6px 2px!important;
+}
+#rankList{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:stretch!important;
+  padding:0!important;
+}
+.rankItem{
+  width:100%!important;
+  display:flex!important;
+  justify-content:flex-end!important;
+  align-items:center!important;
+  gap:3px!important;
+  padding:0 2px 0 0!important;
+  margin:0!important;
+}
+.rankCheck{
+  flex:0 0 auto!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  text-align:right!important;
+}
+.rankName{
+  flex:0 0 auto!important;
+  width:auto!important;
+  max-width:132px!important;
+  min-width:0!important;
+  margin:0!important;
+  text-align:right!important;
+}
+.rankCopy{
+  flex:0 0 auto!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  text-align:left!important;
+}
+@media(max-width:900px){
+  aside{width:190px!important}
+  .rankName{max-width:105px!important}
+}
+
+/* v14.86: custom eased leaderboard auto-scroll handles motion without browser scroll jumps. */
+#rankList{scroll-behavior:auto!important;overflow-anchor:none!important;}
+
+
+/* v15.02 셔플 순서 동기화 + 오른쪽 명단 가독성 확대 */
+aside{width:245px!important}
+.rankItem{min-height:31px!important;height:31px!important;line-height:31px!important;gap:5px!important;padding:0 5px!important}
+.rankCheck{flex-basis:22px!important;width:22px!important;min-width:22px!important;font-size:21px!important;line-height:31px!important}
+.rankName{font-size:20px!important;line-height:31px!important;max-width:150px!important}
+.rankCopy{font-size:20px!important;line-height:31px!important}
+@media(max-width:900px){aside{width:215px!important}.rankItem{height:27px!important;min-height:27px!important;line-height:27px!important}.rankCheck{font-size:18px!important;line-height:27px!important}.rankName,.rankCopy{font-size:17px!important;line-height:27px!important}}
+
+
+/* v15.10h: 당첨 공이 통로 아래로 떨어진 뒤 팝업 앞으로 탁 튀어 오르는 연출. 팝업은 계속 유지된다. */
+#winnerCard{overflow:visible!important}
+#winnerMarble{position:absolute;left:50%;top:50%;width:72px;height:72px;margin:-36px 0 0 -36px;border-radius:50%;background:hsl(var(--winner-hue,320) 86% 68%);border:3px solid #fff;box-shadow:0 0 18px hsl(var(--winner-hue,320) 86% 68% / .95),0 8px 18px rgba(40,17,51,.28);opacity:0;pointer-events:none;z-index:3;display:flex;align-items:center;justify-content:center;color:#20102b;font-size:15px;font-weight:1000;white-space:nowrap;text-shadow:0 1px 0 rgba(255,255,255,.5)}
+#winnerMarble span{max-width:62px;overflow:hidden;text-overflow:ellipsis;padding:0 4px}
+#winnerCard.marble-pop #winnerMarble{animation:winnerMarblePop 1.35s cubic-bezier(.18,.86,.26,1) forwards}
+@keyframes winnerMarblePop{
+  0%{opacity:1;transform:translate(-2px,220px) scale(.72) rotate(-10deg)}
+  48%{opacity:1;transform:translate(2px,-118px) scale(1.15) rotate(7deg)}
+  68%{opacity:1;transform:translate(-1px,-82px) scale(.98) rotate(-3deg)}
+  84%{opacity:1;transform:translate(0,-102px) scale(1.04) rotate(1deg)}
+  100%{opacity:1;transform:translate(0,-92px) scale(1) rotate(0)}
+}
+
+
+/* v15.10i: 당첨 공은 세로 통로 끝에서 사라지고 Winner 카드만 짠 등장 */
+#winnerMarble{display:none!important}
+#winnerCard.winner-pop{animation:winnerCardPop .52s cubic-bezier(.2,1.25,.32,1) both}
+@keyframes winnerCardPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.72)!important}
+  58%{opacity:1;transform:translate(-50%,-50%) scale(1.08)!important}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1)!important}
+}
+
+/* v15.10n: Winner 팝업 왕관 */
+#winnerCard::after{content:"♛";position:absolute;left:50%;top:-58px;transform:translateX(-50%) rotate(-4deg);font-size:64px;line-height:1;color:#ffd84d;text-shadow:0 3px 0 #9a5a00,0 0 10px #fff4a8,0 0 24px rgba(255,204,38,.95);z-index:2;pointer-events:none;filter:drop-shadow(0 5px 4px rgba(0,0,0,.35))}
+#winnerCard.show::after{animation:winnerCrownPop .58s cubic-bezier(.2,1.35,.3,1) both}
+@keyframes winnerCrownPop{0%{opacity:0;transform:translateX(-50%) translateY(18px) scale(.35) rotate(-12deg)}70%{opacity:1;transform:translateX(-50%) translateY(-3px) scale(1.12) rotate(3deg)}100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1) rotate(-4deg)}}
+
+
+/* v15.10o: 텍스트/별 파티클 대신 팝업 위에 독립된 화려한 왕관 이미지 표시 */
+#winnerCard.burst::before,
+#winnerCard.burst::after{content:none!important;display:none!important;animation:none!important}
+#winnerCard::before,
+#winnerCard::after{content:none!important;display:none!important}
+#winnerCard .winnerCrown{
+  position:absolute;
+  left:50%;
+  top:-106px;
+  width:190px;
+  height:116px;
+  transform:translateX(-50%) translateY(16px) scale(.55) rotate(0deg);
+  transform-origin:50% 85%;
+  background:url('images/winner-crown.svg') center/contain no-repeat;
+  opacity:0;
+  pointer-events:none;
+  z-index:20;
+  filter:drop-shadow(0 10px 8px rgba(25,8,33,.42));
+}
+#winnerCard.show .winnerCrown{
+  animation:winnerCrownImagePop .68s cubic-bezier(.18,1.34,.3,1) .04s forwards;
+}
+@keyframes winnerCrownImagePop{
+  0%{opacity:0;transform:translateX(-50%) translateY(20px) scale(.38) rotate(0deg)}
+  68%{opacity:1;transform:translateX(-50%) translateY(-5px) scale(1.10) rotate(0deg)}
+  100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1) rotate(0deg)}
+}
+#winnerCard small,#winnerCard strong{position:relative;z-index:4}
+
+/* v15.10p: 왕관을 기울임 없이 정중앙 수평 대칭으로 고정 */
+#winnerCard .winnerCrown{transform:translateX(-50%) translateY(16px) scale(.55) rotate(0deg)!important;transform-origin:50% 50%!important}
+#winnerCard.show .winnerCrown{animation-name:winnerCrownImagePopStraight!important}
+@keyframes winnerCrownImagePopStraight{0%{opacity:0;transform:translateX(-50%) translateY(20px) scale(.38) rotate(0deg)}68%{opacity:1;transform:translateX(-50%) translateY(-5px) scale(1.10) rotate(0deg)}100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1) rotate(0deg)}}
+
+
+/* v15.10z: Winner 팝업 등장 순간 은은한 플래시 + 글씨를 가리지 않는 주변 반짝임 */
+#winnerCard .winnerFlash{
+  position:absolute;
+  left:50%;
+  top:50%;
+  width:760px;
+  height:430px;
+  transform:translate(-50%,-50%) scale(.72);
+  border-radius:50%;
+  pointer-events:none;
+  z-index:-1;
+  opacity:0;
+  background:radial-gradient(ellipse at center,
+    rgba(255,255,255,.55) 0%,
+    rgba(255,244,190,.28) 22%,
+    rgba(255,215,120,.11) 48%,
+    rgba(255,255,255,0) 72%);
+  filter:blur(5px);
+}
+#winnerCard.winner-pop .winnerFlash{
+  animation:winnerSoftFlash .92s ease-out both;
+}
+@keyframes winnerSoftFlash{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.64)}
+  16%{opacity:.88;transform:translate(-50%,-50%) scale(1.03)}
+  42%{opacity:.38;transform:translate(-50%,-50%) scale(1.12)}
+  100%{opacity:0;transform:translate(-50%,-50%) scale(1.2)}
+}
+#winnerCard .winnerSparkles{
+  position:absolute;
+  inset:-86px -92px -70px;
+  z-index:21;
+  pointer-events:none;
+}
+#winnerCard .winnerSparkles i{
+  position:absolute;
+  width:12px;
+  height:12px;
+  opacity:0;
+  transform:translate(-50%,-50%) scale(.2) rotate(45deg);
+  background:linear-gradient(135deg,#fff 0 30%,#ffe79a 31% 70%,#fff 71%);
+  clip-path:polygon(50% 0,61% 37%,100% 50%,61% 63%,50% 100%,39% 63%,0 50%,39% 37%);
+  filter:drop-shadow(0 0 5px rgba(255,244,176,.95));
+}
+#winnerCard .winnerSparkles i:nth-child(1){left:9%;top:36%;--dx:-18px;--dy:-12px;--delay:.02s}
+#winnerCard .winnerSparkles i:nth-child(2){left:19%;top:12%;--dx:-8px;--dy:-20px;--delay:.10s;width:9px;height:9px}
+#winnerCard .winnerSparkles i:nth-child(3){left:36%;top:3%;--dx:-4px;--dy:-18px;--delay:.18s;width:7px;height:7px}
+#winnerCard .winnerSparkles i:nth-child(4){left:91%;top:35%;--dx:18px;--dy:-10px;--delay:.06s}
+#winnerCard .winnerSparkles i:nth-child(5){left:80%;top:10%;--dx:10px;--dy:-20px;--delay:.14s;width:9px;height:9px}
+#winnerCard .winnerSparkles i:nth-child(6){left:65%;top:1%;--dx:5px;--dy:-16px;--delay:.22s;width:7px;height:7px}
+#winnerCard .winnerSparkles i:nth-child(7){left:4%;top:70%;--dx:-16px;--dy:8px;--delay:.20s;width:8px;height:8px}
+#winnerCard .winnerSparkles i:nth-child(8){left:96%;top:69%;--dx:16px;--dy:8px;--delay:.26s;width:8px;height:8px}
+#winnerCard.winner-pop .winnerSparkles i{
+  animation:winnerSparkleTwinkle 1.25s ease-out var(--delay) both;
+}
+@keyframes winnerSparkleTwinkle{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.15) rotate(45deg)}
+  28%{opacity:.95;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.15) rotate(45deg)}
+  58%{opacity:.55;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.72) rotate(45deg)}
+  100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(.2) rotate(45deg)}
+}
+#winnerCard.winner-pop .winnerCrown{
+  filter:drop-shadow(0 10px 8px rgba(25,8,33,.42)) drop-shadow(0 0 13px rgba(255,230,128,.9));
+}
+
+/* v15.10at: Winner 팝업 렌더 최적화 — 디자인/타이밍 유지, 합성 레이어 중심 */
+#winnerCard{
+  contain:layout paint style;
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+}
+#winnerCard .winnerCrown,
+#winnerCard .winnerFlash,
+#winnerCard .winnerSparkles i{
+  will-change:transform,opacity;
+  backface-visibility:hidden;
+}
+/* 큰 blur 필터는 팝업 등장 프레임의 GPU 비용이 커서 가벼운 방사형 그라데이션으로 대체 */
+#winnerCard .winnerFlash{
+  width:620px!important;
+  height:350px!important;
+  filter:none!important;
+  background:radial-gradient(ellipse at center,rgba(255,255,255,.46) 0%,rgba(255,244,190,.22) 25%,rgba(255,215,120,.08) 48%,rgba(255,255,255,0) 72%)!important;
+}
+/* 반짝이는 DOM을 그대로 재사용하되 4개만 렌더해 순간 합성 부하를 절반으로 축소 */
+#winnerCard .winnerSparkles i:nth-child(n+5){display:none!important}
+#winnerCard .winnerSparkles i{
+  filter:none!important;
+  box-shadow:0 0 7px rgba(255,244,176,.72);
+}
+#winnerCard.winner-pop .winnerCrown{
+  filter:drop-shadow(0 8px 6px rgba(25,8,33,.38))!important;
+}
+\n\n/* v15.10az: 당첨 확대 및 Winner 반짝 효과 복구 */\n#winnerCard .winnerFlash{\n  z-index:1!important;\n  opacity:0;\n}\n#winnerCard .winnerSparkles{z-index:7!important}\n#winnerCard .winnerCrown{z-index:8!important}\n#winnerCard small,#winnerCard strong{z-index:9!important}\n/* 최적화는 유지하면서 주변 반짝임은 다시 충분히 보이도록 8개 모두 사용 */\n#winnerCard .winnerSparkles i:nth-child(n+5){display:block!important}\n#winnerCard.winner-pop .winnerFlash{animation:winnerSoftFlash .92s ease-out both!important}\n#winnerCard.winner-pop .winnerSparkles i{animation:winnerSparkleTwinkle 1.25s ease-out var(--delay) both!important}\n#winnerCard.winner-pop .winnerCrown{animation:winnerCrownImagePopStraight .68s cubic-bezier(.18,1.34,.3,1) .04s forwards!important}\n
+/* v15.10bb: Winner 팝업 별빛 플래시 효과 확실히 복구 */
+#winnerCard .winnerFlash{
+  position:absolute!important;
+  inset:-86px!important;
+  border-radius:50%!important;
+  pointer-events:none!important;
+  opacity:0;
+  z-index:1!important;
+  background:
+    radial-gradient(circle at 50% 50%,rgba(255,255,255,.98) 0 6%,rgba(255,249,190,.72) 18%,rgba(255,224,126,.28) 38%,rgba(255,255,255,0) 68%)!important;
+  transform:scale(.72);
+  will-change:transform,opacity;
+}
+#winnerCard.winner-pop .winnerFlash{
+  animation:winnerStarFlashBB .82s cubic-bezier(.18,.78,.28,1) both!important;
+}
+@keyframes winnerStarFlashBB{
+  0%{opacity:0;transform:scale(.64)}
+  18%{opacity:.96;transform:scale(1.02)}
+  42%{opacity:.58;transform:scale(1.14)}
+  100%{opacity:0;transform:scale(1.34)}
+}
+#winnerCard .winnerSparkles{
+  position:absolute!important;
+  inset:-46px!important;
+  pointer-events:none!important;
+  z-index:7!important;
+  overflow:visible!important;
+}
+#winnerCard .winnerSparkles i{
+  position:absolute!important;
+  display:block!important;
+  width:12px!important;
+  height:12px!important;
+  opacity:0;
+  transform:translate(-50%,-50%) scale(.2) rotate(0deg);
+  will-change:transform,opacity;
+  background:transparent!important;
+  filter:none!important;
+}
+#winnerCard .winnerSparkles i::before,
+#winnerCard .winnerSparkles i::after{
+  content:"";
+  position:absolute;
+  left:50%;top:50%;
+  background:#fffbe7;
+  border-radius:999px;
+  box-shadow:0 0 8px rgba(255,245,170,.95),0 0 16px rgba(255,218,99,.72);
+  transform:translate(-50%,-50%);
+}
+#winnerCard .winnerSparkles i::before{width:3px;height:100%}
+#winnerCard .winnerSparkles i::after{width:100%;height:3px}
+#winnerCard.winner-pop .winnerSparkles i{
+  animation:winnerStarTwinkleBB 1.18s ease-out var(--delay,0s) both!important;
+}
+@keyframes winnerStarTwinkleBB{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.15) rotate(0deg)}
+  26%{opacity:1;transform:translate(calc(-50% + var(--dx,0px)*.35),calc(-50% + var(--dy,0px)*.35)) scale(1.2) rotate(35deg)}
+  60%{opacity:.82;transform:translate(calc(-50% + var(--dx,0px)*.72),calc(-50% + var(--dy,0px)*.72)) scale(.76) rotate(72deg)}
+  100%{opacity:0;transform:translate(calc(-50% + var(--dx,0px)),calc(-50% + var(--dy,0px))) scale(.18) rotate(115deg)}
+}
+
+/* v15.10bc: 왕관·별빛이 팝업 바깥에서 잘리던 paint containment 충돌 수정 */
+#winnerCard{
+  contain:layout style!important;
+  overflow:visible!important;
+  isolation:isolate;
+}
+#winnerCard .winnerCrown{
+  display:block!important;
+  visibility:visible!important;
+  opacity:0;
+  z-index:30!important;
+  width:190px!important;
+  height:116px!important;
+  background-image:url('images/winner-crown.svg')!important;
+  background-position:center!important;
+  background-repeat:no-repeat!important;
+  background-size:contain!important;
+}
+#winnerCard.show .winnerCrown,
+#winnerCard.winner-pop .winnerCrown{
+  animation:winnerCrownVisibleBC .72s cubic-bezier(.18,1.34,.3,1) .03s forwards!important;
+}
+@keyframes winnerCrownVisibleBC{
+  0%{opacity:0;transform:translateX(-50%) translateY(18px) scale(.42) rotate(0deg)}
+  65%{opacity:1;transform:translateX(-50%) translateY(-5px) scale(1.10) rotate(0deg)}
+  100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1) rotate(0deg)}
+}
+#winnerCard .winnerSparkles{
+  display:block!important;
+  visibility:visible!important;
+  overflow:visible!important;
+  z-index:29!important;
+}
+#winnerCard .winnerSparkles i{display:block!important;visibility:visible!important}
+#winnerCard.winner-pop .winnerSparkles i{
+  animation:winnerStarTwinkleBC 1.35s ease-out var(--delay,0s) both!important;
+}
+@keyframes winnerStarTwinkleBC{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.1) rotate(0deg)}
+  22%{opacity:1;transform:translate(calc(-50% + var(--dx,0px)*.25),calc(-50% + var(--dy,0px)*.25)) scale(1.45) rotate(28deg)}
+  50%{opacity:.95;transform:translate(calc(-50% + var(--dx,0px)*.58),calc(-50% + var(--dy,0px)*.58)) scale(.95) rotate(62deg)}
+  76%{opacity:.72;transform:translate(calc(-50% + var(--dx,0px)*.82),calc(-50% + var(--dy,0px)*.82)) scale(1.18) rotate(92deg)}
+  100%{opacity:0;transform:translate(calc(-50% + var(--dx,0px)),calc(-50% + var(--dy,0px))) scale(.18) rotate(125deg)}
+}
+#winnerCard .winnerFlash{z-index:0!important}
+#winnerCard small,#winnerCard strong{z-index:31!important}

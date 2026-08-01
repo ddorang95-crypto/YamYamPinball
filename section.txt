@@ -1,0 +1,501 @@
+function rnd(seed){let x=seed>>>0;return()=>{x=Math.imul(1664525,x)+1013904223>>>0;return x/4294967296}}
+const BASE_W=900,W=1120,H=5200,R=27;
+function seg(x1,y1,x2,y2,b=.42){return{x1,y1,x2,y2,b}}function peg(x,y,r=10,b=.72){return{x,y,r,b}}
+function mapDef(type,seed=0){
+ let s=[],p=[],rot=[],bum=[],kick=[],decor=[],routePts=[],routeWidths=[];const mr=rnd((Number(seed)||1)^hash(type));
+ const worldH=type==='wheel'?4700:type==='cascade'?8200:7350;
+ s.push(seg(72,0,72,worldH+40,.22),seg(BASE_W-72,0,BASE_W-72,worldH+40,.22));
+ const addCorridor=(pts,widths,b=.34)=>{
+  const left=[],right=[];
+  for(let i=0;i<pts.length;i++){
+   const prev=pts[Math.max(0,i-1)],next=pts[Math.min(pts.length-1,i+1)],dx=next[0]-prev[0],dy=next[1]-prev[1],len=Math.hypot(dx,dy)||1,nx=-dy/len,ny=dx/len,w=(widths[i]||widths.at(-1))/2;
+   left.push([pts[i][0]+nx*w,pts[i][1]+ny*w]);right.push([pts[i][0]-nx*w,pts[i][1]-ny*w]);
+  }
+  for(let i=0;i<pts.length-1;i++){s.push(seg(left[i][0],left[i][1],left[i+1][0],left[i+1][1],b),seg(right[i][0],right[i][1],right[i+1][0],right[i+1][1],b))}
+ };
+ const addMixPegs=(y,xs)=>xs.forEach((x,i)=>p.push(peg(x,y+(i%2)*34,9,.82)));
+ const finalTop=worldH-1120;
+ if(type==='wheel'){
+  // 캔디: 가장 짧고 넓은 스피드 코스. 큰 U턴과 중앙 광장이 반복된다.
+  const pts=[[450,0],[450,260],[300,560],[600,920],[270,1280],[630,1660],[300,2040],[600,2430],[300,2820],[585,3200],[450,finalTop]];
+  const widths=[720,720,700,720,690,720,690,720,690,710,650];routePts=pts;routeWidths=widths;addCorridor(pts,widths,.37);
+  [700,1450,2200,2950].forEach((y,k)=>{rot.push({x:k%2?610:290,y,len:120+k*10,a:k*.8,spd:.026});addMixPegs(y+130,[250,350,450,550,650])});
+  bum.push({x:205,y:1090,r:38,kick:1.22},{x:695,y:1850,r:38,kick:1.22},{x:210,y:2620,r:38,kick:1.22});
+  for(let y=420;y<finalTop-150;y+=700)decor.push({kind:'candy',x:y%1400<700?125:775,y});
+ }else if(type==='cascade'){
+  // 두 번째 맵: 사용자가 그린 길쭉한 핀볼 타워 구조.
+  // 좁은 출발 목 → 넓은 직선 몸통 → 하단 회전막대 구간 → 결승 집결부 순서다.
+  const pts=[[450,0],[450,620],[450,930],[450,1500],[450,2550],[450,3900],[450,5200],[450,6200],[450,finalTop]];
+  const widths=[360,400,720,740,740,735,720,660,620];routePts=pts;routeWidths=widths;addCorridor(pts,widths,.40);
+  const addDiamond=(x,y,size,b=.88)=>{const h=size/2;s.push(seg(x,y-h,x+h,y,b),seg(x+h,y,x,y+h,b),seg(x,y+h,x-h,y,b),seg(x-h,y,x,y-h,b))};
+  // 상단 목 부분의 얇은 회전 핀볼 막대기 2개.
+  rot.push({x:365,y:690,len:165,a:Math.PI/2+.08,spd:.026},{x:535,y:690,len:165,a:Math.PI/2-.08,spd:-.026});
+  // 중앙의 청록색 마름모 장애물 배치.
+  addDiamond(450,1320,245,.94);
+  addDiamond(270,2680,165,.92);addDiamond(630,2680,165,.92);
+  addDiamond(450,4200,245,.96);
+  // 몸통이 너무 비어 보이지 않도록 작은 회전바를 중간중간 배치한다.
+  rot.push({x:265,y:1900,len:145,a:.25,spd:.022},{x:635,y:2150,len:145,a:2.7,spd:-.022});
+  rot.push({x:450,y:3300,len:185,a:.9,spd:.020});
+  // 하단 양쪽의 짧은 막대들은 모두 실제로 회전하며 공을 안쪽으로 튕긴다.
+  for(let i=0;i<8;i++){
+   const y=5000+i*165,ang=.58+(i%2)*.12;
+   rot.push({x:155,y,len:150,a:-ang,spd:.030+(i%3)*.002});
+   rot.push({x:745,y,len:150,a:Math.PI+ang,spd:-.030-(i%3)*.002});
+  }
+  // 그림 속 아래쪽 긴 막대기 2개도 큰 회전축으로 구현한다.
+  rot.push({x:315,y:6100,len:430,a:Math.PI/2+.12,spd:.016},{x:585,y:6100,len:430,a:Math.PI/2-.12,spd:-.016});
+  // 긴 막대기 아래에서 공이 중앙 결승 통로로 모이도록 완만한 가이드 벽을 둔다.
+  s.push(seg(175,5680,245,6500,.52),seg(725,5680,655,6500,.52));
+  s.push(seg(245,6500,365,finalTop,.50),seg(655,6500,535,finalTop,.50));
+ }else{
+  // 버섯: 가장 길고 복잡한 미로 코스. 루프처럼 크게 돌아 합류하는 구간과 좁은 목이 반복된다.
+  const pts=[[450,0],[450,380],[300,760],[600,1120],[600,1580],[300,1940],[300,2440],[600,2800],[600,3300],[285,3680],[615,4100],[615,4580],[310,4960],[310,5480],[590,5860],[450,finalTop]];
+  const widths=[720,720,690,720,680,720,670,720,670,720,690,680,720,680,710,640];routePts=pts;routeWidths=widths;addCorridor(pts,widths,.40);
+  [680,1450,2250,3050,3900,4750,5600].forEach((y,k)=>{rot.push({x:k%2?620:280,y:y+100,len:105+(k%3)*25,a:k*.55,spd:.024});addMixPegs(y+250,[270,360,450,540,630])});
+  bum.push({x:205,y:1750,r:37,kick:1.2},{x:695,y:2700,r:37,kick:1.2},{x:205,y:4020,r:37,kick:1.2},{x:695,y:5350,r:37,kick:1.2});
+  for(let y=500;y<finalTop-150;y+=880)decor.push({kind:'mushroom',x:y%1760<880?130:770,y});
+ }
+ // 세 맵 공통 랜덤 이벤트 구간: 같은 맵도 경기마다 장애물 조합·방향·속도가 달라진다.
+ const cameraStops=[];
+ const eventTop=900,eventBottom=finalTop-260;
+ const eventCount=type==='wheel'?8:type==='cascade'?10:11;
+ const eventGap=(eventBottom-eventTop)/Math.max(1,eventCount-1);
+ for(let ei=0;ei<eventCount;ei++){
+  const y=eventTop+eventGap*ei+(mr()-.5)*180;
+  const kind=Math.floor(mr()*8),flip=mr()<.5?-1:1;
+  cameraStops.push({y,kind,weight:1+(kind===5||kind===6?0.45:0)});
+  if(kind===0){
+   // 좌우 교차 회전봉
+   rot.push({x:300+(mr()-.5)*55,y:y-35,len:150+mr()*70,a:mr()*Math.PI,spd:flip*(.020+mr()*.018)});
+   rot.push({x:600+(mr()-.5)*55,y:y+45,len:150+mr()*70,a:mr()*Math.PI,spd:-flip*(.020+mr()*.018)});
+  }else if(kind===1){
+   // 삼각 범퍼 군집
+   bum.push({x:450,y:y-70,r:29+mr()*10,kick:1.18+mr()*.18});
+   bum.push({x:315,y:y+65,r:25+mr()*9,kick:1.16+mr()*.16});
+   bum.push({x:585,y:y+65,r:25+mr()*9,kick:1.16+mr()*.16});
+  }else if(kind===2){
+   // 좌우 방향이 매번 바뀌는 튕김판
+   kick.push({x:285,y:y-20,r:34,dir:flip,power:.72+mr()*.25});
+   kick.push({x:615,y:y+70,r:34,dir:-flip,power:.72+mr()*.25});
+   addMixPegs(y+5,[380,450,520]);
+  }else if(kind===3){
+   // 지그재그 핀 구간
+   for(let j=0;j<7;j++)p.push(peg(255+j*65+(j%2?28:-18),y-115+j*36,8+mr()*3,.86));
+  }else if(kind===4){
+   // 중앙 대형 회전봉 + 양옆 범퍼
+   rot.push({x:450,y,len:230+mr()*85,a:mr()*Math.PI,spd:flip*(.016+mr()*.015)});
+   bum.push({x:225,y:y+45,r:27+mr()*8,kick:1.15+mr()*.17},{x:675,y:y-45,r:27+mr()*8,kick:1.15+mr()*.17});
+  }else if(kind===5){
+   // 엇갈린 회전문: 통과 타이밍에 따라 좌우 진로가 크게 갈린다.
+   rot.push({x:335,y:y-42,len:205+mr()*45,a:mr()*Math.PI,spd:flip*(.025+mr()*.013)});
+   rot.push({x:565,y:y+58,len:205+mr()*45,a:mr()*Math.PI,spd:-flip*(.025+mr()*.013)});
+   p.push(peg(450,y+8,12,.94));
+  }else if(kind===6){
+   // 범퍼 링: 중앙 또는 바깥쪽으로 연속 튕기며 순위가 섞인다.
+   const rr0=115+mr()*30;
+   for(let j=0;j<6;j++){const a=j*Math.PI/3+(mr()-.5)*.16;bum.push({x:450+Math.cos(a)*rr0,y:y+Math.sin(a)*rr0,r:24+mr()*7,kick:1.22+mr()*.20})}
+   kick.push({x:450,y,r:32,dir:flip,power:.88+mr()*.24});
+  }else{
+   // 개방형 슬라럼: 긴 대각 벽은 공이 쌓이면 통로 전체를 막을 수 있어 사용하지 않는다.
+   // 대신 작은 핀과 짧은 회전봉만 배치해 어느 맵에서도 항상 중앙 통과 폭을 남긴다.
+   const side=flip>0?1:-1;
+   for(let j=0;j<6;j++)p.push(peg(285+j*66+(j%2?side*20:-side*16),y-92+j*34,8+mr()*2,.88));
+   rot.push({x:side>0?310:590,y:y+95,len:118+mr()*26,a:side>0?.35:Math.PI-.35,spd:-side*(.018+mr()*.010)});
+  }
+ }
+ // v11.6: 출발 직후 공이 첫 장애물에 막혀 한 덩어리로 굳지 않도록
+ // 모든 맵의 상단 1100px 구간에서는 회전봉·핀·범퍼·킥 장애물을 제거한다.
+ // 외곽 코스 벽은 유지되어 공이 넓게 퍼진 상태로 첫 본구간에 진입한다.
+ const topClearY=1100;
+ p=p.filter(q=>q.y>=topClearY);
+ bum=bum.filter(q=>q.y>=topClearY);
+ kick=kick.filter(q=>q.y>=topClearY);
+ rot=rot.filter(q=>q.y>=topClearY);
+
+ // 실제 메인 게임 맵의 가로폭 확장: 미니맵 표시만 키우는 것이 아니라
+ // 모든 벽·코너·장애물·경로 중심 좌표를 900 기준에서 1120 기준으로 변환한다.
+ const mapScale=W/BASE_W,mapCx=W/2,baseCx=BASE_W/2,scaleX=x=>mapCx+(x-baseCx)*mapScale;
+ s=s.map(g=>({...g,x1:scaleX(g.x1),x2:scaleX(g.x2)}));
+ p=p.map(q=>({...q,x:scaleX(q.x)}));
+ bum=bum.map(q=>({...q,x:scaleX(q.x)}));
+ kick=kick.map(q=>({...q,x:scaleX(q.x)}));
+ rot=rot.map(q=>({...q,x:scaleX(q.x),len:q.len*mapScale}));
+ decor=decor.map(q=>({...q,x:scaleX(q.x)}));
+ routePts=routePts.map(([x,y])=>[scaleX(x),y]);
+ routeWidths=routeWidths.map(w=>w*mapScale);
+ // 전 맵 공통 안전 보정: 회전 장애물은 현재 코스 폭의 46%보다 길어질 수 없다.
+ // 어느 각도로 돌아도 반대편 벽까지 닿지 않아 완전 차단이 생기지 않는다.
+ const routeAtY=(yy)=>{
+  if(!routePts?.length)return{x:450,w:620};let i=0;while(i<routePts.length-2&&yy>routePts[i+1][1])i++;
+  const a=routePts[i],b=routePts[Math.min(i+1,routePts.length-1)],t=clamp((yy-a[1])/Math.max(1,b[1]-a[1]),0,1);
+  return{x:a[0]+(b[0]-a[0])*t,w:(routeWidths[i]||520)+((routeWidths[Math.min(i+1,routeWidths.length-1)]||520)-(routeWidths[i]||520))*t};
+ };
+ rot=rot.map(r=>{const lane=routeAtY(r.y),maxLen=Math.max(82,lane.w*.46);r.len=Math.min(r.len,maxLen);r.x=clamp(r.x,lane.x-lane.w*.27,lane.x+lane.w*.27);return r});
+ // 같은 높이에 범퍼가 과도하게 몰리는 조합도 제거한다. 중앙에는 최소 공 4개 폭의 통로를 유지한다.
+ bum=bum.filter((q,idx)=>{const lane=routeAtY(q.y),centerGap=Math.abs(q.x-lane.x);if(centerGap<92&&q.r>30){const peers=bum.filter((o,j)=>j!==idx&&Math.abs(o.y-q.y)<95&&Math.abs(o.x-lane.x)<150);return peers.length<2}return true});
+ // 공통 결승: 급하게 좁아지는 V자가 아니라, 넓은 사다리꼴 집결부 → 완만한 바닥 → 중앙 통로.
+ const mergeTop=finalTop,gateY=worldH-500,exitX=W/2,entryY=gateY+70,chuteHalf=82,chuteLeft=exitX-chuteHalf,chuteRight=exitX+chuteHalf;
+ // 상단 폭을 넉넉히 유지하고, 아래쪽까지 완만하게 줄어드는 사다리꼴 벽을 만든다.
+ const trapShoulderY=mergeTop+130,trapFloorY=gateY-105;
+ const edgeL=90,edgeR=W-90;
+ s.push(seg(edgeL,mergeTop,edgeL+12,trapShoulderY,.43),seg(edgeR,mergeTop,edgeR-12,trapShoulderY,.43));
+ s.push(seg(edgeL+12,trapShoulderY,235,trapFloorY,.49),seg(edgeR-12,trapShoulderY,W-235,trapFloorY,.49));
+ // 바닥을 거의 평평한 얕은 V 형태로 넓게 받아 공이 한 점에 갑자기 뭉치지 않게 한다.
+ s.push(seg(235,trapFloorY,exitX-150,entryY-18,.58),seg(W-235,trapFloorY,exitX+150,entryY-18,.58));
+ s.push(seg(exitX-150,entryY-18,chuteLeft,entryY,.60),seg(exitX+150,entryY-18,chuteRight,entryY,.60));
+ // 마지막 통로도 기존보다 조금 넓혀 공이 회전봉 주변에서 덜 막히도록 한다.
+ s.push(seg(chuteLeft,entryY,chuteLeft,worldH+35,.28),seg(chuteRight,entryY,chuteRight,worldH+35,.28));
+ // 모든 내부 구조물은 외벽 안쪽 안전영역에서만 존재하도록 마지막에 강제 보정한다.
+ // 중심점뿐 아니라 회전 반경과 구조물 크기까지 계산해 어느 각도에서도 밖으로 나오지 않는다.
+ const safeL=112,safeR=W-112,safeT=12,safeB=worldH-12;
+ for(let i=2;i<s.length;i++){const g=s[i];g.x1=clamp(g.x1,safeL,safeR);g.x2=clamp(g.x2,safeL,safeR);g.y1=clamp(g.y1,safeT,safeB+40);g.y2=clamp(g.y2,safeT,safeB+40)}
+ const keepCircle=q=>{const r=Math.max(0,Number(q.r)||0),m=r+8;q.x=clamp(q.x,safeL+m,safeR-m);q.y=clamp(q.y,safeT+m,safeB-m);return q};
+ p=p.map(keepCircle);bum=bum.map(keepCircle);kick=kick.map(keepCircle);
+ rot=rot.map(r=>{const edge=Math.max(28,Math.min(r.x-safeL,safeR-r.x,r.y-safeT,safeB-r.y));r.len=Math.min(r.len,Math.max(48,edge*2-18));r.x=clamp(r.x,safeL+r.len/2+9,safeR-r.len/2-9);r.y=clamp(r.y,safeT+r.len/2+9,safeB-r.len/2-9);return r});
+ const gate={pivotX:exitX-84,pivotY:entryY-4,len:300,a:mr()*Math.PI*2,spd:.024,centerPivot:true};
+ // 하단 회전축을 결승 통로 입구 쪽(사용자 표시 지점)으로 옮겼다.
+ // 막대 중심과 실제 충돌 중심이 동일한 좌표를 사용해 공이 더 자연스럽게 표면을 따라 흐른다.
+ const gateHalfEdge=Math.max(34,Math.min(gate.pivotX-safeL,safeR-gate.pivotX,gate.pivotY-safeT,safeB-gate.pivotY));gate.len=Math.min(gate.len,gateHalfEdge*2-24);
+ // 광폭 맵 비율에 맞춰 모든 핀볼 오브젝트도 함께 확대한다.
+ p.forEach(q=>q.r*=1.18);
+ bum.forEach(q=>q.r*=1.18);
+ rot.forEach(q=>q.len*=1.04);
+ if(gate)gate.len*=1.12;
+ return{s,p,rot,bum,kick,decor,cameraStops,routePts,routeWidths,worldH,finishY:worldH-16,finishGateY:mergeTop,finishX:exitX,finalZone:{top:mergeTop,left:edgeL,right:edgeR,pocketTop:trapShoulderY,trapFloorY,gateY,cleanDropTop:entryY,chuteLeft,chuteRight},gate}
+}
+function startPhysics(){const physicsEpoch=++lifecycleEpoch;lastRace=state.raceId;const rr=rnd((state.seed||1)+(state.shuffleNonce||0)*9973),raw=balls();for(let i=raw.length-1;i>0;i--){const j=Math.floor(rr()*(i+1));[raw[i],raw[j]]=[raw[j],raw[i]]}
+ // 공을 한 지점에서 동시에 쏟지 않고 넓은 폭에 분산한 뒤 아주 짧은 시간차로 출발시킨다.
+ const cols=Math.max(14,Math.min(38,Math.ceil(Math.sqrt(Math.max(1,raw.length)*4.2))));
+ const now=performance.now(),targetMs=clamp(65000+raw.length*210,70000,135000),spacing=R*2+7;
+ const arr=raw.map((b,i)=>{const row=Math.floor(i/cols),slot=i%cols,zig=row%2?.5:0,base=cols===1?W/2:125+(slot+zig)*((W-250)/Math.max(1,cols-1));const seed=((state.seed||1)^hash(b.ballId)^((i+1)*2654435761))>>>0;const lane=(slot/(Math.max(1,cols-1))-.5);const releaseJitter=Math.floor(rr()*34);return{...b,x:clamp(base+(rr()-.5)*28,116,W-116),y:28-row*spacing,prevX:0,prevY:28-row*spacing,vx:lane*.22+(rr()-.5)*.48,vy:.018+rr()*.045,r:R,releaseAt:now+row*92+(i%9)*17+releaseJitter,done:false,qualified:false,rank:0,lastMoveAt:now,lastMoveY:28-row*spacing,stuckCount:0,ghostUntil:0,stunStart:0,stunUntil:0,stunTriggered:false,stunAnchorY:0,stunCooldownUntil:0,lastWallBounceAt:0,lastGateKickAt:0,lastGateTouchAt:0,gateSide:0,gateContactUntil:0,gateLiftUntil:0,lastFlowBounceAt:0,lastLowerBounceAt:0,lastFinalSeparateAt:0,finalLaneSide:0,finishDropSpeed:0,rngState:seed||1}});for(const b of arr){b.prevX=b.x;b.prevY=b.y}manualCam=null;sim={balls:arr,map:mapDef(state.map,state.seed),finish:[],last:now,startedAt:now,targetMs,hardDeadline:targetMs+30000,acc:0,lastSend:0,paused:false,cam:0,camX:W/2,camZoom:.82,slowRank:0,slowUntil:0,slowedRanks:new Set(),finishFocusUntil:0,finishFlash:null,entrySlowRank:0,entrySlowUntil:0,entrySlowed:new Set(),finishZoomUntil:0,finishZoomStart:0,focusBallId:null,preWinnerFocusRank:0,preWinnerFocusStartedAt:0,preSlowTarget:0,slowScale:1,slowTarget:1,completionSent:false,winnerResolved:false,winnerResolvedAt:0,cameraTargetY:0,cameraTargetX:W/2,cameraTargetZoom:1,cameraHoldUntil:0,cameraLastPick:0,cameraReason:'출발',cameraVelocityY:0,cameraVelocityX:0,bottomCameraLocked:false,bottomCameraLockedAt:0,stunGateCooldownUntil:0,jamWatchAt:now,jamZones:new Map(),lastStepAt:now};}
+function collideSeg(b,g){
+ const dx=g.x2-g.x1,dy=g.y2-g.y1,L=dx*dx+dy*dy;if(L<.0001)return false;
+ const t=clamp(((b.x-g.x1)*dx+(b.y-g.y1)*dy)/L,0,1),cx=g.x1+t*dx,cy=g.y1+t*dy;
+ let nx=b.x-cx,ny=b.y-cy,d=Math.hypot(nx,ny);if(d>=b.r)return false;
+ if(d<.0001){nx=-dy;ny=dx;d=Math.hypot(nx,ny)||1}
+ const ux=nx/d,uy=ny/d,pen=b.r-d;
+ // 아주 작은 겹침 보정만 수행하고, 반사에는 임의 힘을 섞지 않는다.
+ b.x+=ux*(pen+.02);b.y+=uy*(pen+.02);
+ const vn=b.vx*ux+b.vy*uy;
+ if(vn<0){
+  const bounce=clamp(Number(g.b)||.48,.18,.72),tx=-uy,ty=ux;
+  const vt=b.vx*tx+b.vy*ty;
+  b.vx=tx*vt*.992-ux*vn*bounce;
+  b.vy=ty*vt*.992-uy*vn*bounce;
+ }
+ return true;
+}
+function collidePeg(b,q){
+ let nx=b.x-q.x,ny=b.y-q.y,d=Math.hypot(nx,ny),min=b.r+q.r;if(d>=min)return false;
+ if(d<.0001){nx=1;ny=0;d=1}
+ nx/=d;ny/=d;b.x+=nx*(min-d+.02);b.y+=ny*(min-d+.02);
+ const vn=b.vx*nx+b.vy*ny;
+ if(vn<0){const bounce=clamp(Number(q.b)||.58,.22,.82);b.vx-=(1+bounce)*vn*nx;b.vy-=(1+bounce)*vn*ny}
+ return true;
+}
+function collideBalls(a){
+ const grid=new Map(),cs=58,now=performance.now();
+ for(const b of a){if(b.done||now<(b.releaseAt||0))continue;const k=(b.x/cs|0)+','+(b.y/cs|0);(grid.get(k)||grid.set(k,[]).get(k)).push(b)}
+ for(const b of a){if(b.done||now<(b.releaseAt||0))continue;let gx=b.x/cs|0,gy=b.y/cs|0;
+  for(let ix=-1;ix<=1;ix++)for(let iy=-1;iy<=1;iy++)for(const o of grid.get((gx+ix)+','+(gy+iy))||[]){
+   if(o===b||o.done||now<(o.releaseAt||0)||o.ballId<b.ballId)continue;
+   const fz=sim?.map?.finalZone;
+   const inFinal=!!(fz&&b.y>fz.pocketTop-70&&o.y>fz.pocketTop-70);
+   const fastPair=!!(fz&&b.fastDrain&&o.fastDrain&&b.y>fz.cleanDropTop-12&&o.y>fz.cleanDropTop-12);
+   // 빠른 배출 구간의 일반 공은 서로 압력을 전달하지 않는다.
+   // 하나라도 fastDrain이면 충돌 섬에서 제외해 뒤 공이 앞 공을 밀어 올리는 현상을 차단한다.
+   if(fz&&(b.fastDrain||o.fastDrain)&&b.y>fz.cleanDropTop-18&&o.y>fz.cleanDropTop-18)continue;
+   let dx=o.x-b.x,dy=o.y-b.y,d=Math.hypot(dx,dy),m=b.r+o.r;if(d>=m)continue;
+   if(d<.001){const side=((hash(String(b.ballId))+hash(String(o.ballId)))&1)?1:-1;dx=.01*side;dy=.004;d=Math.hypot(dx,dy)}
+   const nx=dx/d,ny=dy/d;
+   // 공마다 독립된 원형 바디로 겹침을 나눠 가진다. 결승부에서도 충돌을 생략하지 않는다.
+   // 겹침을 한 번에 강제로 떼지 않고 여러 작은 솔버 반복으로 풀어 벽을 타고 오르는 흐름을 살린다.
+   const correction=fastPair?.10:(inFinal?.44:.54),p=(m-d)*correction+.006;
+   b.x-=nx*p;b.y-=ny*p;o.x+=nx*p;o.y+=ny*p;
+   const rv=(o.vx-b.vx)*nx+(o.vy-b.vy)*ny;
+   if(rv<0){
+    const restitution=fastPair?.02:(inFinal?.08:.24);
+    const j=-(1+restitution)*rv*.5;
+    b.vx-=j*nx;b.vy-=j*ny;o.vx+=j*nx;o.vy+=j*ny;
+    if(inFinal){
+     // 결승부에서는 압력이 한 덩어리 속도로 평균화되지 않도록 접선 속도를 각 공에 조금씩 보존한다.
+     const tx=-ny,ty=nx,relT=(o.vx-b.vx)*tx+(o.vy-b.vy)*ty,fr=relT*.010;
+     b.vx+=fr*tx;b.vy+=fr*ty;o.vx-=fr*tx;o.vy-=fr*ty;
+    }
+   }
+  }
+ }
+}
+function winningTargetRanks(){
+ const total=sim?.balls?.length||balls().length;
+ if(state?.winMode==='first')return[1];
+ if(state?.winMode==='last')return total?[total]:[];
+ return(state?.winningRanks||[]).filter(n=>n>0&&n<=total);
+}
+function updateSlowMotion(now){
+ if(!sim||sim.paused)return 1;
+ const nextRank=sim.finish.length+1,targets=winningTargetRanks(),fz=sim.map.finalZone;
+ const upcoming=targets.filter(r=>r>=nextRank).sort((a,b)=>a-b)[0]||0;
+ const remaining=upcoming?upcoming-nextRank:999;
+ const contenders=sim.balls.filter(b=>!b.qualified&&!b.done&&fz&&b.y>fz.gateY-430);
+ // 바로 다음에 들어올 공이 당첨 공이면, 순번과 관계없이 결승 입구부터 즉시 추적한다.
+ // 특히 1번째 당첨은 기다릴 여유가 없으므로 가장 빠르게 확대한다.
+ if(upcoming===nextRank&&contenders.length){
+  const center=(fz.chuteLeft+fz.chuteRight)/2;
+  const lead=contenders.slice().sort((a,b)=>b.y-a.y||Math.abs(a.x-center)-Math.abs(b.x-center))[0];
+  if(lead){
+   if(String(sim.focusBallId)!==String(lead.ballId)){sim.finishZoomStart=now;sim.cameraHoldUntil=0}
+   sim.focusBallId=lead.ballId;sim.finishZoomUntil=now+(nextRank===1?2300:2800);sim.firstWinnerPreview=true;
+  }
+  return nextRank===1?.42:.46;
+ }
+ sim.firstWinnerPreview=false;
+ // 당첨 순번 3~4개 전부터 전체 흐름을 단계적으로 늦춰 누가 내려가는지 눈으로 따라갈 수 있게 한다.
+ if(upcoming&&remaining<=4&&contenders.length){
+  if(sim.preSlowTarget!==upcoming){sim.preSlowTarget=upcoming;sim.finishZoomStart=now;sim.finishZoomUntil=now+12000;sim.focusBallId=null}
+  if(remaining>=4)return .78;
+  if(remaining===3)return .64;
+  if(remaining===2)return .50;
+  if(remaining===1)return .38;
+  return .30;
+ }
+ if(now>=sim.slowUntil)sim.slowRank=0;
+ return 1;
+}
+function ballRand(b){let x=b.rngState>>>0;x^=x<<13;x^=x>>>17;x^=x<<5;b.rngState=x>>>0;return(b.rngState>>>0)/4294967296}
+function step(dt){
+ if(!sim||sim.paused)return;
+ const now=performance.now(),elapsed=now-sim.startedAt;sim.lastStepAt=now;
+ // 공 개수와 무관하게 모든 공에 같은 중력·충돌 규칙을 적용한다.
+ const lateBoost=1+clamp((elapsed-sim.targetMs*.78)/(sim.targetMs*.58),0,1)*.52;
+ for(const r of sim.map.rot){
+  // 모든 회전 장애물도 이전 각도를 저장해 프레임 사이의 이동 궤적 전체를 충돌 검사한다.
+  r.prevA=Number.isFinite(r.a)?r.a:0;
+  const frameRatio=clamp(dt/16.67,.35,1.45);
+  r.a=(r.a+r.spd*frameRatio)%(Math.PI*2);
+ }
+ if(sim.map.gate){
+  const g=sim.map.gate;
+  // 결승 회전바는 공의 충격과 무관하게 한 방향, 일정 속도로 계속 회전한다.
+  g.spd=-.034;
+  // 회전 전 각도를 저장해 프레임 사이를 쓸어가는 충돌까지 검사한다.
+  g.prevA=Number.isFinite(g.a)?g.a:0;
+  g.a=(g.a+g.spd*clamp(dt/16.67,.35,1.45))%(Math.PI*2);
+ }
+ for(const b of sim.balls){
+  if(b.done||now<(b.releaseAt||0))continue;
+  b.prevX=b.x;b.prevY=b.y;
+  const progress=b.y-b.lastMoveY;
+  if(progress>13){b.lastMoveY=b.y;b.lastMoveAt=now;b.stuckCount=0}
+  // 오래 정체된 공에도 순간적인 강한 킥 대신 아주 약한 중력 보조만 준다.
+  if(now-b.lastMoveAt>2600){
+   b.vx+=(ballRand(b)-.5)*.018;
+   b.vy=Math.max(b.vy,.055);
+   b.stuckCount++;b.lastMoveAt=now;
+  }
+  const fz0=sim.map.finalZone,gate0=sim.map.gate;
+  // v13.4: 입구 스턴을 제거해 공이 뭉친 채 멈추거나 말려 올라가지 않게 한다.
+  b.stunUntil=0;b.stunTriggered=false;b.stunAnchorY=0;
+  const stunned=now<b.stunUntil;
+  if(stunned){
+   // 제자리에서 잠깐 맞물리는 느낌만 주고 위로 떠오르지는 않는다.
+   b.vx*=.90;b.vy*=.82;b.vy+=.00020*dt;
+   b.vy=clamp(b.vy,0,.016);
+   if(b.stunAnchorY)b.y+=(b.stunAnchorY-b.y)*.08;
+  }else{
+   if(b.stunTriggered&&now>=(b.stunUntil||0)){b.stunTriggered=false;b.stunAnchorY=0;b.vx+=(ballRand(b)-.5)*.055;b.vy=Math.max(b.vy,.035+ballRand(b)*.025)}
+   // 플리퍼 접촉 후에도 중력은 항상 동일하게 유지한다.
+   // 인위적으로 가볍게 만들거나 공을 막대기 방향으로 끌고 가는 처리는 하지 않는다.
+   b.vy+=.00068*dt*lateBoost;
+   b.vx*=.99935;b.vy*=.99915;
+  }
+  // v13.4: 혼잡 구간에서도 공을 위로 튕기지 않고 아래 방향 흐름을 유지한다.
+  // 주변 공이 많을수록 좌우로만 살짝 벌리고, 최소 하강속도를 보장해 연속 배출한다.
+  const fzFlow=sim.map.finalZone;
+  const middleTop=(sim.map.worldH||H)*.38,middleBottom=fzFlow?fzFlow.top-180:(sim.map.worldH||H)*.78;
+  const inMiddleFlow=b.y>middleTop&&b.y<middleBottom;
+  const inLowerFlow=!!(fzFlow&&b.y>fzFlow.top-150&&!b.qualified);
+  if(inMiddleFlow||inLowerFlow){
+   const rangeY=inLowerFlow?70:88,rangeX=inLowerFlow?104:126;
+   const nearby=sim.balls.reduce((n,o)=>n+(o!==b&&!o.done&&!o.qualified&&Math.abs(o.y-b.y)<rangeY&&Math.abs(o.x-b.x)<rangeX?1:0),0);
+   if(nearby>=3){
+    const center=sim.map.finishX||W/2;
+    const outward=b.x<center?-1:1;
+    const strength=Math.min(.030,.006+nearby*.0022);
+    b.vx+=outward*strength+(ballRand(b)-.5)*.010;
+    b.vy=Math.max(b.vy,inLowerFlow?.070:.052);
+   }
+   if(inLowerFlow&&b.vy>.165)b.vy+=(.165-b.vy)*.08;
+   else if(inMiddleFlow&&b.vy>.185)b.vy+=(.185-b.vy)*.05;
+  }
+  const prevX=b.x,prevY=b.y;const moveScale=.82;b.x+=b.vx*dt*moveScale;b.y+=b.vy*dt*moveScale;
+  // 고정 서브스텝에서 한 번씩만 충돌을 해결한다. 중복 안전 패스와 강제 투영은 사용하지 않는다.
+  for(const g of sim.map.s)collideSeg(b,g);
+  for(const q of sim.map.p)collidePeg(b,q);
+  for(const q of sim.map.bum){
+   if(collidePeg(b,{...q,b:.62})){
+    const dx=b.x-q.x,dy=b.y-q.y,dd=Math.hypot(dx,dy)||1,boost=(q.kick||1.15)*.055;
+    b.vx+=(dx/dd)*boost;b.vy+=(dy/dd)*boost;
+   }
+  }
+  for(const q of sim.map.kick||[]){
+   const dx=b.x-q.x,dy=b.y-q.y,dd=Math.hypot(dx,dy);
+   if(dd<b.r+q.r&&dd>0){b.vx+=q.dir*q.power*.075;b.vy-=q.power*.035}
+  }
+  for(const r of sim.map.rot){
+   const c=Math.cos(r.a),sn=Math.sin(r.a),bar=seg(r.x-c*r.len/2,r.y-sn*r.len/2,r.x+c*r.len/2,r.y+sn*r.len/2,.42);
+   if(collideSeg(b,bar)){
+    const rx=b.x-r.x,ry=b.y-r.y,surfaceVX=-r.spd*ry,surfaceVY=r.spd*rx;
+    b.vx+=surfaceVX*.055;b.vy+=surfaceVY*.055;
+   }
+  }
+  if(sim.map.gate){
+   const g=sim.map.gate,c=Math.cos(g.a),sn=Math.sin(g.a),half=g.len/2;
+   // 하단 막대는 공을 데리고 회전시키는 장치가 아니라, 닿는 순간 한 번만 밀어내는 장애물이다.
+   // 반발력은 낮게 두고 회전 접선속도를 매 프레임 전달하지 않는다.
+   const bar=seg(g.pivotX-c*half,g.pivotY-sn*half,g.pivotX+c*half,g.pivotY+sn*half,.20);
+   const hitGate=collideSeg(b,bar);
+   if(hitGate){
+    const rx=b.x-g.pivotX,ry=b.y-g.pivotY;
+    const surfaceVX=-g.spd*ry,surfaceVY=g.spd*rx;
+    const sm=Math.hypot(surfaceVX,surfaceVY)||1;
+    const justTouched=now-(b.lastGateTouchAt||0)>145;
+    b.lastGateTouchAt=now;
+    if(justTouched&&now-(b.lastGateKickAt||0)>285){
+     // 막대기의 회전 속도를 공에 복사하지 않는다. 실제 부딪힌 순간에만
+     // 막대기가 진행하는 쪽으로 부드럽게 반사되어 살짝 올라가도록 한 번의 충격만 준다.
+     const tangentX=surfaceVX/sm;
+     const tangentY=surfaceVY/sm;
+     b.vx+=tangentX*.036;
+     // 위로 말아 올리지 않고 접촉 후에도 아래쪽 흐름을 유지한다.
+     b.vy=Math.max(b.vy,.028);
+     b.lastGateKickAt=now;
+    }
+    // 붙잡거나 딸려 올라가는 지속 힘은 전혀 주지 않는다.
+    b.vx=clamp(b.vx,-.30,.30);
+    b.vy=clamp(b.vy,-.028,.40);
+   }
+  }
+  // 공정 레일 강제 가이드: 외벽과 안쪽 길 사이의 빈 공간으로 빠지지 못하게 한다.
+  // 현재 높이의 중심선과 폭을 보간해 모든 공이 동일한 안쪽 코스만 타도록 한다.
+  if(sim.map.routePts?.length>1&&b.y<sim.map.finalZone.top){
+   const pts=sim.map.routePts,ws=sim.map.routeWidths||[];let i=0;
+   while(i<pts.length-2&&b.y>pts[i+1][1])i++;
+   const a=pts[i],c=pts[Math.min(i+1,pts.length-1)],dy=Math.max(1,c[1]-a[1]),t=clamp((b.y-a[1])/dy,0,1);
+   const cx=a[0]+(c[0]-a[0])*t,w=(ws[i]||ws.at(-1)||500)+((ws[Math.min(i+1,ws.length-1)]||ws.at(-1)||500)-(ws[i]||ws.at(-1)||500))*t;
+   const margin=b.r+8,left=cx-w*.47+margin,right=cx+w*.47-margin;
+   if(b.x<left){b.x=left;if(b.vx<0)b.vx*=-.38}
+   if(b.x>right){b.x=right;if(b.vx>0)b.vx*=-.38}
+  }
+  // 벽 밖 이탈도 순위와 무관한 대칭 반사로 처리한다.
+  const worldLeft=86+b.r,worldRight=W-86-b.r;
+  if(b.x<worldLeft){b.x=worldLeft;if(b.vx<0)b.vx*=-.42}
+  if(b.x>worldRight){b.x=worldRight;if(b.vx>0)b.vx*=-.42}
+  // 결승부는 실제 사다리꼴 벽의 폭을 높이별로 계산해 공을 항상 내부에 가둔다.
+  // 플리퍼에 강하게 맞아도 외곽 빈 공간으로 빠지지 않고 안쪽 벽에 반사되어 다시 코스로 돌아온다.
+  const fz=sim.map.finalZone;
+  if(fz&&b.y>fz.top-70){
+   let left=fz.left,right=fz.right;
+   if(b.y<=fz.pocketTop){
+    const t=clamp((b.y-fz.top)/Math.max(1,fz.pocketTop-fz.top),0,1);
+    left=fz.left+(112-fz.left)*t;right=fz.right+(788-fz.right)*t;
+   }else if(b.y<=fz.trapFloorY){
+    const t=clamp((b.y-fz.pocketTop)/Math.max(1,fz.trapFloorY-fz.pocketTop),0,1);
+    left=112+(255-112)*t;right=788+(645-788)*t;
+   }else if(b.y<=fz.cleanDropTop){
+    const t=clamp((b.y-fz.trapFloorY)/Math.max(1,fz.cleanDropTop-fz.trapFloorY),0,1);
+    left=255+(fz.chuteLeft-255)*t;right=645+(fz.chuteRight-645)*t;
+   }else{left=fz.chuteLeft;right=fz.chuteRight}
+   const minX=left+b.r+3,maxX=right-b.r-3;
+   if(b.x<minX){b.x=minX;if(b.vx<0)b.vx*=-.38}
+   if(b.x>maxX){b.x=maxX;if(b.vx>0)b.vx*=-.38}
+   if(b.y<fz.top-70){b.y=fz.top-70;b.vy=Math.abs(b.vy)*.56+.045}
+   // 결승 통로에서는 중앙으로 강제 정렬하지 않는다. 벽 반사와 공끼리 충돌로 자연스럽게 순위가 바뀐다.
+   if(b.y>fz.trapFloorY){
+    // 결승 순번이 아직 멀리 남은 공은 플리퍼를 지난 뒤 통로에서 머물지 않고 빠르게 배출한다.
+    // 당첨 3~5개 전부터만 속도를 낮춰 후보 공을 눈으로 확인할 수 있게 한다.
+    const nextRankNow=sim.finish.length+1;
+    const nextWinnerRank=winningTargetRanks().filter(r=>r>=nextRankNow).sort((a,c)=>a-c)[0]||0;
+    const winnerGap=nextWinnerRank?nextWinnerRank-nextRankNow:999;
+    const nearWinner=winnerGap<=5;
+    const inCleanChute=b.y>=fz.cleanDropTop-8;
+    b.fastDrain=!!(inCleanChute&&!nearWinner);
+    if(b.fastDrain){
+     // 당첨과 무관한 앞 공은 통로에 머물지 않도록 즉시 빠른 배출 모드로 전환한다.
+     // 지름 54px 공이 겹치지 않도록 실제로 들어갈 수 있는 좌/우 2개 레인만 사용한다.
+     const laneSide=(hash(String(b.ballId))&1)?1:-1;
+     const laneX=(fz.chuteLeft+fz.chuteRight)/2+laneSide*34;
+     b.vx+=(laneX-b.x)*.00042*dt;
+     b.vx*=.965;
+     // 기존보다 약 1.7배 빠르게 아래로 빼고, 뒤 공의 충돌 압력은 받지 않는다.
+     b.vy=Math.max(b.vy,.285);
+     b.vy=Math.min(b.vy,.365);
+    }else{
+     b.fastDrain=false;
+     b.vx*=.996;
+     const finalCap=winnerGap<=1?.064:winnerGap<=3?.078:.092;
+     if(b.vy>finalCap)b.vy+=(finalCap-b.vy)*.16;
+    }
+   }
+  }
+  if(b.y<-180){b.y=-180;b.vy=Math.abs(b.vy)+.08}
+  // 실제 결승선에 먼저 닿은 순서로만 순위를 확정한다. 통로 안에서는 계속 벽·공 충돌 경쟁이 이어진다.
+  if(fz&&!b.qualified&&prevY<=sim.map.finishY&&b.y>sim.map.finishY&&b.x>fz.chuteLeft-b.r&&b.x<fz.chuteRight+b.r){
+   b.qualified=true;b.rank=sim.finish.length+1;b.finishEnteredAt=now;b.finishVisualUntil=now+2600;
+   const fin={...b,rank:b.rank};sim.finish.push(fin);
+   const isWinner=winningTargetRanks().includes(fin.rank);
+   sim.finishFocusUntil=now+(isWinner?7200:1200);
+   if(isWinner){b.finishVisualUntil=now+7600;sim.winnerResolved=true;sim.winnerResolvedAt=now;sim.slowRank=0;sim.slowUntil=now+7000;sim.slowTarget=.28;sim.focusBallId=b.ballId;sim.finishZoomStart=now;sim.finishZoomUntil=now+7800;sim.finishFlash={...fin,startAt:now,peakAt:now+360,holdUntil:now+6400,until:now+7600};}
+   apiQuiet('finishBall',{ballId:b.ballId}).catch(()=>{});
+   // 결승선을 통과한 공도 즉시 삭제하지 않고 감속된 낙하 연출을 유지한다.
+   b.vx*=.18;b.vy=clamp(b.vy,.022,.060);
+  }
+  if(b.qualified&&!b.done){
+   const winner=winningTargetRanks().includes(b.rank);
+   b.vx*=winner?.88:.94;b.vy+=.00010*dt;b.vy=clamp(b.vy,winner?.010:.028,winner?.045:.14);
+   if(b.y>sim.map.finishY+(winner?440:250)||now>(b.finishVisualUntil||0))b.done=true;
+  }
+ }
+ const active=sim.balls.filter(b=>!b.done&&now>=(b.releaseAt||0));
+ // v12.5: 결승 통로의 강제 대기열·정지·중앙 정렬을 제거한다.
+ // 공들은 일반 중력과 공-공 충돌 압력으로 경사벽을 타고 올라갔다가 다시 내려오며 자연스럽게 분리된다.
+ // 전 맵 자동 병목 감시: 같은 150px 높이 구간에 공이 많이 몰리고 2.4초 이상 거의 내려가지 않으면
+ // 해당 구간의 공 전체를 동일 조건으로 아래·좌우 분산시켜 막힘만 해제한다. 순위를 직접 바꾸는 이동은 하지 않는다.
+ if(now-(sim.jamWatchAt||0)>420){
+  sim.jamWatchAt=now;const bands=new Map();
+  for(const q of active){if(q.qualified||(sim.map.finalZone&&q.y>sim.map.finalZone.trapFloorY-40))continue;const key=Math.floor(q.y/150);(bands.get(key)||bands.set(key,[]).get(key)).push(q)}
+  for(const [key,list] of bands){
+   if(list.length<Math.max(8,Math.ceil(sim.balls.length*.045)))continue;
+   const avgVy=list.reduce((a,q)=>a+Math.abs(q.vy),0)/list.length;
+   const stalled=list.filter(q=>now-(q.lastMoveAt||now)>1450).length;
+   const ratio=stalled/list.length,prev=sim.jamZones.get(key)||0;
+   if(ratio>.58&&avgVy<.085){
+    if(!prev)sim.jamZones.set(key,now);
+    else if(now-prev>950){
+     list.forEach((q,i)=>{const side=((hash(String(q.ballId))&1)?1:-1)*(.018+ballRand(q)*.016);q.vx+=side;q.vy=Math.max(q.vy,.095);q.lastMoveAt=now;q.stuckCount=0});
+     sim.jamZones.delete(key);
+    }
+   }else sim.jamZones.delete(key);
+  }
+ }
+ // 개수에 따라 일부 공만 선택하지 않고, 공간 분할 충돌을 모든 공에 동일하게 적용한다.
+ // 혼잡한 하단은 작은 반복 솔버로 겹침을 부드럽게 해소해 각 공이 따로 움직이게 한다.
+ collideBalls(active);
+ if(sim.map.finalZone&&active.some(q=>q.y>sim.map.finalZone.pocketTop-80&&!q.fastDrain))collideBalls(active)
+ if(sim.finish.length>=sim.balls.length&&!sim.completionSent){sim.completionSent=true;apiQuiet('completeRace').catch(()=>{})}
+ if(sim.balls.every(b=>b.done))sim.paused=true
+}
+function sendSnapshot(){if(!sim||snapshotInFlight||resetInFlight||mutationBusy)return;const epoch=lifecycleEpoch;snapshotInFlight=true;const activeSim=sim;apiQuiet('snapshot',{balls:activeSim.balls.map(b=>({ballId:b.ballId,name:b.name,copy:b.copy,x:+b.x.toFixed(1),y:+b.y.toFixed(1),done:b.done,qualified:b.qualified,rank:b.rank,vx:+b.vx.toFixed(3),vy:+b.vy.toFixed(3),stunMs:Math.max(0,Math.round(b.stunUntil-performance.now())),waiting:performance.now()<(b.releaseAt||0)})),rot:activeSim.map.rot.map(r=>r.a),gate:activeSim.map.gate?activeSim.map.gate.a:0,cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3)},2500).catch(()=>{}).finally(()=>{if(epoch===lifecycleEpoch)snapshotInFlight=false})}
+function drawMap(ctx,map,theme){ctx.strokeStyle=theme.line;ctx.lineWidth=4;ctx.shadowColor=theme.glow;ctx.shadowBlur=10;ctx.lineCap='round';for(const g of map.s){ctx.beginPath();ctx.moveTo(g.x1,g.y1);ctx.lineTo(g.x2,g.y2);ctx.stroke()}ctx.shadowBlur=0;for(const q of map.p){ctx.fillStyle=theme.peg;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill()}for(const q of map.bum){ctx.fillStyle=theme.bump;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill();ctx.strokeStyle=theme.line;ctx.lineWidth=3;ctx.stroke()}for(const q of map.kick||[]){ctx.save();ctx.translate(q.x,q.y);ctx.fillStyle=theme.bump;ctx.globalAlpha=.82;ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 25px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(q.dir>0?'➜':'➜',0,1);ctx.restore()}for(const d of map.decor||[]){ctx.save();ctx.globalAlpha=.65;ctx.font='42px Arial';ctx.textAlign='center';ctx.fillText(d.kind==='candy'?'🍭':d.kind==='cloud'?'☁️':'🍄',d.x,d.y);ctx.restore()}
+ if(map.finishGateY){
+  ctx.save();
+  ctx.shadowColor=theme.glow;ctx.shadowBlur=18;ctx.strokeStyle=theme.line;ctx.lineWidth=5;
+  const mh=map.worldH||H,fx=map.finishX||W/2;ctx.beginPath();ctx.moveTo(fx-62,mh-48);ctx.lineTo(fx-62,mh+8);ctx.moveTo(fx+62,mh-48);ctx.lineTo(fx+62,mh+8);ctx.stroke();
+  ctx.shadowBlur=0;ctx.fillStyle='rgba(255,255,255,.9)';ctx.font='900 22px Arial';ctx.textAlign='center';
+  ctx.fillText('FINISH',fx,mh-82);
+  ctx.restore();
+ }
+}
+const themes={wheel:{bg:'#180b25',line:'#ffb6e7',glow:'#ff7bd5',peg:'#ffe675',bump:'#ff91c8'},cascade:{bg:'#07182b',line:'#b8edff',glow:'#79d7ff',peg:'#fff',bump:'#a8e8ff'},maze:{bg:'#102417',line:'#bff6a8',glow:'#86e56e',peg:'#ffd36f',bump:'#ff9d72'}};
+function smoothRemoteSource(source,ts){

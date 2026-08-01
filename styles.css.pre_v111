@@ -1,0 +1,247 @@
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:Pretendard,"Noto Sans KR",Arial,sans-serif;background:#050712;color:#fff;overflow:hidden}header{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#0b1020;border-bottom:1px solid #28314a}header i{color:#65f6aa;font-style:normal}main{height:calc(100% - 58px)}.display main{height:100%}.display header{display:none}.stage{position:relative;width:100%;height:calc(100% - 210px);min-height:460px;overflow:hidden}.display .stage{height:100%}.member .stage{height:calc(100% - 190px)}#raceCanvas{width:100%;height:100%;display:block}.statusBar{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:4;display:flex;gap:8px}.statusBar span{padding:8px 14px;border-radius:999px;background:rgba(8,12,25,.78);border:1px solid rgba(255,255,255,.22);backdrop-filter:blur(8px);font-weight:800}.statusBar .solo{background:rgba(95,92,255,.88)}.statusBar .group{background:rgba(255,91,153,.88)}aside{position:absolute;right:14px;top:70px;width:260px;height:68%;background:rgba(7,10,22,.78);border:1px solid rgba(255,255,255,.18);border-radius:16px;padding:12px 8px 10px 12px;backdrop-filter:blur(10px);z-index:4;overflow:hidden}aside h3{margin:0 0 8px;padding:0 4px 8px 55px;font-size:14px;color:#eef4ff;border-bottom:1px solid rgba(255,255,255,.12);white-space:nowrap}#rankList{height:calc(100% - 34px);overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;overscroll-behavior:contain;padding-right:2px;scrollbar-width:none;-ms-overflow-style:none}.rankItem{display:grid;grid-template-columns:34px 12px minmax(0,1fr) 42px;gap:6px;align-items:center;min-height:31px;padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.055);border-left:3px solid var(--rainbow);background:linear-gradient(90deg,var(--rainbowSoft),transparent 72%);animation:rankIn .25s ease}.rankNo{font-weight:1000;color:var(--rainbow);font-size:15px;text-align:right;text-shadow:0 0 8px color-mix(in srgb,var(--rainbow) 60%,transparent)}.rankName{font-weight:900;color:var(--rainbow);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rankCopy{font-size:10px;color:#c4cee8;text-align:right;white-space:nowrap}.colorDot{width:11px;height:11px;border-radius:50%;background:var(--dot);box-shadow:0 0 8px var(--dot)}#counter{position:absolute;right:22px;bottom:18px;z-index:4;font-size:28px;font-weight:900;text-shadow:0 2px 10px #000}.miniMapWrap{position:absolute;left:14px;top:70px;width:145px;height:56%;padding:8px;background:rgba(5,8,18,.78);border:1px solid rgba(255,255,255,.2);border-radius:15px;z-index:5;display:flex;flex-direction:column;gap:6px}.miniMapWrap b{font-size:12px;letter-spacing:1px}.miniMapWrap canvas{width:100%;height:calc(100% - 38px);border-radius:8px}.miniMapWrap span{font-size:11px;color:#ffe36c;text-align:center}.panel{height:210px;background:#0d1223;border-top:1px solid #2b3552;display:grid;grid-template-columns:1.05fr 1.6fr 1.4fr 1.2fr;gap:8px;padding:10px;overflow:auto}.memberPanel{height:190px;grid-template-columns:.7fr 1.6fr 1fr}.group{background:#11182d;border:1px solid #2b3552;border-radius:12px;padding:9px;display:flex;gap:7px;align-items:center;align-content:flex-start;flex-wrap:wrap}.inputGroup{align-items:stretch}.group input,.group textarea,.group select{background:#090e1e;color:#fff;border:1px solid #344062;border-radius:9px;padding:9px;outline:none}.group textarea{width:100%;height:55px;resize:none}.group button{border:1px solid #5267ad;background:#23315d;color:#fff;border-radius:9px;padding:9px 12px;font-weight:800;cursor:pointer}.group button:hover{filter:brightness(1.15)}button.selected,.winChoice.selected{background:#735cff!important;border-color:#a89aff!important;box-shadow:0 0 0 2px rgba(143,121,255,.25)}.primary{background:#7057ff!important}.danger{background:#b52e5e!important}.shuffle{background:#ff9f2f!important;color:#1b0d00!important}.win{display:grid;grid-template-columns:auto 1fr 1fr 1fr;align-items:center}.winChoice{display:flex;gap:5px;align-items:center;padding:8px;border:1px solid #39466c;border-radius:9px;cursor:pointer}.winChoice input{accent-color:#7b61ff}.win #rankNumber{grid-column:1/4}.win #applyWin{grid-column:4}.win #winSaved{grid-column:1/5;font-size:12px;color:#7fffc0}.list{background:#0c1224;border:1px solid #293452;border-radius:10px;overflow:auto;max-height:170px}.pitem{display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid #252e48}.pitem b{flex:1}.pill{font-size:12px;color:#b9c5e8}.miniBtn{background:#a72d57;color:white;border:0;border-radius:7px;padding:5px 8px}#winnerCard{position:absolute;left:50%;bottom:42px;transform:translateX(-50%) translateY(20px);z-index:10;min-width:330px;padding:18px 28px;border-radius:24px;text-align:center;background:linear-gradient(135deg,rgba(255,247,177,.96),rgba(255,168,218,.96));color:#281133;border:3px solid #fff5aa;box-shadow:0 0 35px rgba(255,231,111,.75);opacity:0;pointer-events:none;transition:.5s ease}#winnerCard.show{opacity:1;transform:translateX(-50%) translateY(0)}#winnerCard small{display:block;font-size:18px;font-weight:1000;letter-spacing:4px}#winnerCard strong{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:29px}#winnerCard strong span{display:flex;gap:6px;align-items:center}#winnerCard em{font-size:13px;background:#4c235c;color:white;border-radius:999px;padding:4px 7px;font-style:normal}#winnerCard.burst:before,#winnerCard.burst:after{content:"✦ ✧ ✦ ✧ ✦";position:absolute;left:50%;top:50%;font-size:28px;color:#fff6a9;animation:burst 1.2s ease-out forwards}#winnerCard.burst:after{animation-delay:.12s;transform:rotate(45deg)}@keyframes burst{0%{transform:translate(-50%,-50%) scale(.3);opacity:1}100%{transform:translate(-50%,-50%) scale(4);opacity:0}}@keyframes rankIn{from{opacity:0;transform:translateX(15px)}to{opacity:1;transform:none}}@media(max-width:900px){.panel{grid-template-columns:1fr;height:44%;}.stage{height:56%}.miniMapWrap{width:100px}aside{width:175px}#winnerCard{min-width:270px}.statusBar{left:12px;transform:none;flex-wrap:wrap}.statusBar span{font-size:11px;padding:6px 9px}}
+.rankItem.live{background:linear-gradient(90deg,var(--rainbowSoft),rgba(105,220,255,.055),transparent 78%)}
+.rankItem.preview{background:linear-gradient(90deg,var(--rainbowSoft),rgba(255,255,255,.018),transparent 78%)}
+.rankState{font-size:10px;color:#dce5ff;opacity:.7;white-space:nowrap;text-align:right}
+
+#raceCanvas{background:radial-gradient(circle at 50% 15%,rgba(255,255,255,.06),transparent 35%)}
+.rankItem.preview{border-left-color:var(--rainbow)}
+#shuffleBtn{box-shadow:0 0 0 2px rgba(255,180,70,.18)}
+
+#rankList::-webkit-scrollbar{display:none;width:0;height:0}
+
+/* v4.5 안정화: 오른쪽 목록을 맵 위 HUD처럼 표시 */
+aside{
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  padding:0!important;
+  overflow:visible!important;
+  width:260px!important;
+  right:20px!important;
+  top:86px!important;
+  height:70%!important;
+  pointer-events:auto;
+}
+aside h3{
+  border:0!important;
+  background:transparent!important;
+  padding:0 2px 7px!important;
+  margin:0!important;
+  color:#fff!important;
+  text-shadow:0 2px 5px rgba(0,0,0,.95),0 0 8px rgba(0,0,0,.85);
+  font-size:14px!important;
+}
+#rankList{
+  height:calc(100% - 27px)!important;
+  padding:0!important;
+  contain:layout paint style;
+  will-change:scroll-position;
+  scroll-behavior:auto!important;
+  -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%);
+  mask-image:linear-gradient(to bottom,transparent 0,#000 18px,#000 calc(100% - 18px),transparent 100%);
+}
+.rankItem{
+  min-height:28px!important;
+  padding:3px 2px!important;
+  border:0!important;
+  background:transparent!important;
+  animation:none!important;
+  opacity:1!important;
+  filter:none!important;
+  transform:none!important;
+  text-shadow:0 2px 4px rgba(0,0,0,.98),0 0 7px rgba(0,0,0,.85);
+  transition:color .12s linear,opacity .12s linear;
+  contain:layout style;
+}
+.rankItem.newArrival{animation:arrivalPulse .45s ease-out!important}
+.rankNo,.rankName{color:var(--rainbow)!important;text-shadow:0 2px 4px #000,0 0 6px color-mix(in srgb,var(--rainbow) 45%,transparent)!important}
+.rankCopy,.rankState{color:rgba(255,255,255,.9)!important;text-shadow:0 2px 4px #000!important;opacity:1!important}
+.colorDot{box-shadow:0 0 5px var(--dot)!important}
+@keyframes arrivalPulse{0%{transform:translateX(7px);opacity:.35}100%{transform:none;opacity:1}}
+
+.rankItem{font-variant-numeric:tabular-nums}.rankCopy{font-size:12px;font-weight:900;color:var(--rainbow);text-align:right}.rankItem.live .rankNo:after{content:"위";font-size:9px;margin-left:1px}.rankItem.preview .rankNo:after{content:"번";font-size:9px;margin-left:1px}.rankItem:not(.live):not(.preview) .rankNo:after{content:"위";font-size:9px;margin-left:1px}
+
+/* v5.0 결승 연출 및 결과 가독성 */
+aside h3{display:none!important}
+#rankList{height:100%!important;-webkit-mask-image:none!important;mask-image:none!important}
+.rankItem{grid-template-columns:42px 14px minmax(0,1fr) 54px!important;min-height:35px!important;padding:5px 2px!important}
+.rankNo{font-size:19px!important}
+.rankName{font-size:18px!important}
+.rankCopy{font-size:15px!important}
+#counter{font-size:31px!important}
+#winnerCard{left:50%!important;top:50%!important;bottom:auto!important;transform:translate(-50%,-50%) scale(.94)!important;min-width:390px!important;padding:24px 34px!important}
+#winnerCard.show{transform:translate(-50%,-50%) scale(1)!important}
+#winnerCard small{font-size:20px!important}
+#winnerCard strong{font-size:34px!important}
+
+.personTotal{opacity:.72;font-size:12px;margin-left:auto;white-space:nowrap}.pitem .pill strong{font-size:15px}.pitem{gap:8px}
+
+
+/* v5.7 참가자 공 개수 강조 */
+.admin .panel{height:286px;grid-template-columns:1.05fr 1.6fr 1.4fr 1.2fr;grid-template-rows:auto 112px;overflow:hidden}
+.admin .stage{height:calc(100% - 286px)}
+.participantBoard{grid-column:1/-1;display:flex;flex-direction:column;min-height:108px;border:2px solid #7765ff;border-radius:14px;background:linear-gradient(135deg,rgba(71,53,149,.38),rgba(11,18,39,.96));box-shadow:0 0 20px rgba(118,96,255,.22);overflow:hidden}
+.participantBoardTitle{height:34px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(115,92,255,.24);border-bottom:1px solid rgba(255,255,255,.16)}
+.participantBoardTitle b{font-size:16px;color:#fff}.participantBoardTitle strong{font-size:15px;color:#ffe977}
+.participantList{max-height:none!important;flex:1!important;border:0!important;border-radius:0!important;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-content:start;gap:6px;padding:7px;overflow-y:auto!important;background:transparent!important}
+.participantList .pitem{min-height:55px;padding:7px 10px;border:1px solid rgba(255,255,255,.14);border-radius:10px;background:rgba(5,9,22,.72);gap:9px}
+.participantList .pitem b{font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.personRank{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#30275c;color:#dcd6ff;font-size:12px;font-weight:900}
+.personBallCount{min-width:70px;display:flex;align-items:baseline;justify-content:center;gap:3px;color:#ffe66b;text-shadow:0 0 10px rgba(255,223,80,.42)}
+.personBallCount strong{font-size:25px;line-height:1}.personBallCount small{font-size:13px;font-weight:900}.emptyParticipants{grid-column:1/-1;text-align:center;padding:18px;color:#9da8c7}
+.personTotal,.pitem .pill{display:none!important}
+@media(max-width:900px){.admin .panel{height:44%;grid-template-rows:auto 120px}.admin .stage{height:56%}.participantList{grid-template-columns:1fr}}
+.rankItem.winnerArrival{background:rgba(255,235,115,.2);box-shadow:inset 0 0 0 2px #ffe56f,0 0 18px rgba(255,229,111,.55);animation:winnerRowPulse .8s ease-in-out 3}
+@keyframes winnerRowPulse{50%{transform:scale(1.025);filter:brightness(1.35)}}
+
+/* v6.0 참가자별 공 개수 안전 조정 */
+.ballAdjust{display:flex;align-items:center;gap:6px;margin-left:auto;white-space:nowrap}
+.ballAdjust button{height:32px;border:1px solid #6476bd;border-radius:8px;background:#25345f;color:#fff;font-weight:900;cursor:pointer}
+.ballAdjust .countMinus,.ballAdjust .countPlus{width:34px;padding:0;font-size:20px;line-height:1}
+.ballAdjust .countSet{padding:0 10px;font-size:12px;background:#594ac4}
+.ballAdjust button:hover{filter:brightness(1.18)}
+.participantList .personBallCount{min-width:58px}
+@media(max-width:700px){.participantList .pitem{flex-wrap:wrap}.ballAdjust{width:100%;justify-content:flex-end}.ballAdjust .countSet{flex:1;max-width:110px}}
+
+/* v6.5 관리자 하단 참가자 목록 가시성 개선 */
+html,body.admin{overflow-y:auto!important;overflow-x:hidden!important}
+.admin main{height:auto!important;min-height:calc(100vh - 58px)!important}
+.admin .stage{height:calc(100vh - 58px - 235px)!important;min-height:460px!important}
+.admin .panel{
+  height:auto!important;
+  min-height:430px!important;
+  grid-template-rows:auto minmax(230px,auto)!important;
+  overflow:visible!important;
+  padding-bottom:18px!important;
+}
+.admin .participantBoard{min-height:230px!important;max-height:360px!important}
+.admin .participantList{min-height:190px!important;max-height:320px!important;overflow-y:auto!important;scrollbar-width:thin!important}
+.admin .participantList::-webkit-scrollbar{width:10px}
+.admin .participantList::-webkit-scrollbar-thumb{background:#6557c7;border-radius:999px;border:2px solid #171d35}
+.admin .participantList::-webkit-scrollbar-track{background:#10162a}
+@media(max-height:800px){
+  .admin .stage{height:500px!important}
+  .admin .panel{min-height:410px!important}
+}
+
+/* v8.2 - 오른쪽 순위 목록을 화면 세로 공간에 꽉 채움 */
+.display aside,
+.member aside,
+.admin aside{
+  top:48px!important;
+  bottom:8px!important;
+  height:auto!important;
+  padding:5px 7px 5px 8px!important;
+  border-radius:10px!important;
+}
+aside h3{
+  display:none!important;
+}
+#rankList{
+  height:100%!important;
+  padding:0!important;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  gap:0;
+}
+.rankItem{
+  grid-template-columns:32px 10px minmax(0,1fr) 40px!important;
+  gap:5px!important;
+  min-height:20px!important;
+  height:20px;
+  padding:0 3px!important;
+  border-bottom:0!important;
+  line-height:20px!important;
+}
+.rankNo{
+  font-size:16px!important;
+  line-height:20px!important;
+}
+.rankName{
+  font-size:16px!important;
+  line-height:20px!important;
+}
+.rankCopy{
+  font-size:12px!important;
+  line-height:20px!important;
+}
+.colorDot{
+  width:8px!important;
+  height:8px!important;
+}
+#counter{
+  top:10px!important;
+  right:20px!important;
+  bottom:auto!important;
+  font-size:20px!important;
+  z-index:6!important;
+}
+@media(max-height:760px){
+  .rankItem{min-height:17px!important;height:17px;line-height:17px!important}
+  .rankNo,.rankName{font-size:14px!important;line-height:17px!important}
+  .rankCopy{font-size:10px!important;line-height:17px!important}
+  .display aside,.member aside,.admin aside{top:40px!important;bottom:4px!important}
+}
+
+/* v8.3 - 순위 이름/번호 가독성 및 결승 사다리꼴 구조 대응 */
+.display aside,.member aside,.admin aside{
+  width:270px!important;
+  right:8px!important;
+  overflow:visible!important;
+}
+#rankList{
+  overflow-y:auto!important;
+  overflow-x:visible!important;
+  contain:none!important;
+  mask-image:none!important;
+  -webkit-mask-image:none!important;
+}
+.rankItem{
+  grid-template-columns:34px 11px minmax(74px,118px) 40px!important;
+  column-gap:4px!important;
+  min-height:23px!important;
+  height:23px!important;
+  line-height:23px!important;
+  padding:0 4px!important;
+  overflow:visible!important;
+  opacity:1!important;
+  visibility:visible!important;
+}
+.rankNo,.rankName,.rankCopy{
+  opacity:1!important;
+  visibility:visible!important;
+  line-height:23px!important;
+}
+.rankNo{font-size:18px!important}
+.rankName{
+  font-size:18px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  min-width:0!important;
+}
+.rankCopy{
+  font-size:15px!important;
+  width:40px!important;
+  justify-self:end!important;
+  text-align:right!important;
+  margin-left:0!important;
+}
+.colorDot{width:9px!important;height:9px!important}
+@media(max-height:760px){
+  .rankItem{min-height:20px!important;height:20px!important;line-height:20px!important}
+  .rankNo,.rankName{font-size:16px!important;line-height:20px!important}
+  .rankCopy{font-size:13px!important;line-height:20px!important}
+}
+
+/* v9.3 - 공 번호 누락 방지 및 이름-번호 간격 정돈 */
+.rankItem{grid-template-columns:34px 11px minmax(78px,128px) 34px!important;column-gap:3px!important}
+.rankCopy{width:34px!important;min-width:34px!important;font-size:15px!important;color:var(--rainbow)!important;opacity:1!important;visibility:visible!important}
+
+/* v10.0: 미니맵을 왼쪽에 더 크고 또렷하게 고정 */
+.miniMapWrap{left:12px!important;top:66px!important;width:168px!important;height:62%!important;padding:10px!important;background:rgba(3,7,15,.92)!important;border-color:rgba(255,255,255,.28)!important;box-shadow:0 8px 28px rgba(0,0,0,.35)}
+.miniMapWrap canvas{background:#02050b;border:1px solid rgba(255,255,255,.1)}
