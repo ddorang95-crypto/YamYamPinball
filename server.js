@@ -8,6 +8,7 @@ const crypto = require('crypto');
 const PORT = Number(process.env.PORT || 8787);
 const ROOT = __dirname;
 const rooms = new Map();
+const roomStreams = new Map();
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -218,6 +219,7 @@ function handleAction(res, data) {
       room.duration = 0;
       room.status = 'running';
       touch(room);
+      broadcastRoom(room);
       json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks });
       return;
     }
@@ -271,7 +273,39 @@ function handleAction(res, data) {
     default: throw new Error('지원하지 않는 요청입니다.');
   }
 
+  if (action !== 'snapshot') broadcastRoom(room);
   responseState(res, room);
+}
+
+
+function broadcastRoom(room) {
+  const key = cleanRoom(room.code);
+  const clients = roomStreams.get(key);
+  if (!clients || !clients.size) return;
+  const payload = `data: ${JSON.stringify({ ok: true, state: room })}\n\n`;
+  for (const res of [...clients]) {
+    try { res.write(payload); } catch { clients.delete(res); }
+  }
+  if (!clients.size) roomStreams.delete(key);
+}
+
+function openRoomStream(req, res, code) {
+  const key = cleanRoom(code);
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.write(`retry: 1200\ndata: ${JSON.stringify({ ok: true, state: getRoom(key) })}\n\n`);
+  if (!roomStreams.has(key)) roomStreams.set(key, new Set());
+  roomStreams.get(key).add(res);
+  const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 20000);
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    const clients = roomStreams.get(key);
+    if (clients) { clients.delete(res); if (!clients.size) roomStreams.delete(key); }
+  });
 }
 
 function serveStatic(req, res, pathname) {
@@ -292,6 +326,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (url.pathname === '/health') return json(res, 200, { ok: true });
     if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: getRoom(url.searchParams.get('room')) });
+    if (url.pathname === '/api/events' && req.method === 'GET') return openRoomStream(req, res, url.searchParams.get('room'));
     if (url.pathname === '/api/action' && req.method === 'POST') {
       try { return handleAction(res, await readJson(req)); }
       catch (error) { return json(res, 400, { ok: false, error: error.message || '오류가 발생했습니다.' }); }

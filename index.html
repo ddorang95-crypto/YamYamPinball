@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>얌얌랜드 마블 핀볼 LIVE</title><link rel="stylesheet" href="styles.css?v=16000"></head>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>얌얌랜드 마블 핀볼 LIVE</title><link rel="stylesheet" href="styles.css?v=17020"></head>
 <body class="unified"><header><b id="brand">얌얌랜드 마블 핀볼</b><span><b id="roomDisplayName">단체 핀볼</b> · <i id="conn">연결 중</i></span></header>
 <nav class="roomTabs" aria-label="핀볼 화면 선택">
 <a data-room="GROUP" href="?room=GROUP">단체 핀볼</a>
@@ -9,11 +9,22 @@
 </nav>
 <main>
 <section class="stage"><div class="statusBar"><span id="modeBadge">단체 핀볼</span><span id="winBadge">당첨: 첫 번째</span><span id="mapBadge">캔디 수레바퀴</span></div><canvas id="raceCanvas"></canvas><div class="miniMapWrap"><b>MINI MAP</b><canvas id="minimapCanvas"></canvas><span id="sectionLabel">출발 구간</span></div><aside><h3 aria-hidden="true"></h3><div id="rankList" aria-label="공 순서 목록"></div></aside><div id="counter">0 / 0</div><div id="winnerCard"><div class="winnerFlash" aria-hidden="true"></div><div class="winnerSparkles" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="winnerCrown" aria-hidden="true"></div><small>WINNER</small><strong id="winnerNames"></strong></div></section>
-<section class="unifiedSide">
-<div class="memberJoinCard"><div class="cardTitle">🎟️ 핀볼 참가하기</div><div class="joinRow full"><input id="ownerInput" placeholder="내 멤버 이름"><button id="saveOwner">이름 저장</button></div><div class="joinRow"><input id="memberNameInput" placeholder="참가 닉네임"><input id="memberCountInput" type="number" min="1" max="5000" value="1"></div><button id="memberAddBtn" type="button">참가 등록</button><div class="publicHint">위 탭에서 화면을 선택하세요. 단체 핀볼은 모두 공유되고, 야미·꿀혜·선하·도릿 탭은 각각 완전히 독립된 핀볼입니다.</div></div>
-<div id="adminPanel"><div class="cardTitle">🎮 관리자 조작</div><div class="group modeGroup"><input id="titleInput" value="Yamyam Marble Pinball"><button id="saveTitle">제목 저장</button></div><div class="group inputGroup"><input id="nameInput" placeholder="관리자 직접 추가 닉네임"><input id="countInput" type="number" min="1" value="1"><button id="addBtn">추가</button><textarea id="bulkInput" placeholder="이름을 쉼표나 엔터로 구분"></textarea><button id="bulkBtn">일괄 추가</button><button id="shuffleBtn" class="shuffle">🎲 공 배치 섞기</button></div><div class="group win"><b>당첨 기준</b><label class="winChoice"><input type="radio" name="win" value="first"> 첫 번째</label><label class="winChoice"><input type="radio" name="win" value="last"> 마지막</label><label class="winChoice"><input type="radio" name="win" value="number"> 숫자 선택</label><input id="rankNumber" value="3" placeholder="예: 3 또는 1,5,10"><button id="applyWin">적용</button><span id="winSaved">설정 저장 전</span></div><div class="group actionGroup"><select id="mapSelect"><option value="wheel">🍭 캔디 수레바퀴</option><option value="greed">🏺 욕망의 항아리 REMIX</option></select><button id="startBtn" class="primary">▶ 레이스 시작</button><button id="resetBtn">경기 초기화</button><button id="clearBtn" class="danger">참가자 전체 삭제</button><b>총 <span id="ballCount">0</span>공</b></div><small id="memberLink"></small></div>
-<div class="participantBoard"><div class="participantBoardTitle"><b>현재 참가자</b><strong id="participantSummary">0명 · 총 0공</strong></div><div class="list participantList" id="participants"></div></div><small id="msg"></small>
-</section></main><script src="app.js?v=16010"></script><script>
+<section class="unifiedBottom panel">
+  <div class="group memberJoinCard">
+    <b class="cardTitle">핀볼 참가</b>
+    <input id="ownerInput" placeholder="내 멤버 이름"><button id="saveOwner">이름 저장</button>
+    <input id="memberNameInput" placeholder="참가 닉네임"><input id="memberCountInput" type="number" min="1" max="5000" value="1">
+    <button id="memberAddBtn" type="button">참가 등록</button>
+  </div>
+  <div id="adminPanel" class="adminGrid">
+    <div class="group inputGroup"><input id="titleInput" value="Yamyam Marble Pinball"><button id="saveTitle">제목 저장</button><input id="nameInput" placeholder="관리자 직접 추가 닉네임"><input id="countInput" type="number" min="1" value="1"><button id="addBtn">추가</button><textarea id="bulkInput" placeholder="이름을 쉼표나 엔터로 구분"></textarea><button id="bulkBtn">일괄 추가</button><button id="shuffleBtn" class="shuffle">🎲 공 배치 섞기</button></div>
+    <div class="group win"><b>당첨 기준</b><label class="winChoice"><input type="radio" name="win" value="first"> 첫 번째</label><label class="winChoice"><input type="radio" name="win" value="last"> 마지막</label><label class="winChoice"><input type="radio" name="win" value="number"> 숫자 선택</label><input id="rankNumber" value="3" placeholder="예: 3 또는 1,5,10"><button id="applyWin">적용</button><span id="winSaved">설정 저장 전</span></div>
+    <div class="group actionGroup"><select id="mapSelect"><option value="wheel">🍭 캔디 수레바퀴</option><option value="greed">🏺 욕망의 항아리 REMIX</option></select><button id="startBtn" class="primary">▶ 레이스 시작</button><button id="resetBtn">경기 초기화</button><button id="clearBtn" class="danger">참가자 전체 삭제</button><b>총 <span id="ballCount">0</span>공</b><small id="memberLink"></small></div>
+  </div>
+  <div class="participantBoard"><div class="participantBoardTitle"><b>현재 참가자</b><strong id="participantSummary">0명 · 총 0공</strong></div><div class="list participantList" id="participants"></div></div>
+  <small id="msg"></small>
+</section>
+</main><script src="app.js?v=17020"></script><script>
 (()=>{
  const params=new URLSearchParams(location.search);
  const room=(params.get('room')||'GROUP').toUpperCase();

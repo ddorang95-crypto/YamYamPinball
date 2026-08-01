@@ -1,7 +1,11 @@
 {
   "name": "yamyam-pinball-unified",
-  "version": "16.0.0",
+  "version": "17.2.0",
   "private": true,
-  "scripts": {"start": "node server.js"},
-  "engines": {"node": ">=20"}
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
 }
