@@ -33,10 +33,11 @@ function emptySnapshot() {
 }
 
 function newRoom(code) {
+  const roomNames = { GROUP: '단체 핀볼', YAMI: '야미 개인 핀볼', GGULHYE: '꿀혜 개인 핀볼', SEONHA: '선하 개인 핀볼', DORIT: '도릿 개인 핀볼' };
   return {
     code,
-    mode: 'group',
-    title: 'Yamyam Marble Pinball',
+    mode: code === 'GROUP' ? 'group' : 'solo',
+    title: roomNames[code] || 'Yamyam Marble Pinball',
     map: 'wheel',
     status: 'lobby',
     participants: [],
@@ -274,7 +275,7 @@ function handleAction(res, data) {
 }
 
 function serveStatic(req, res, pathname) {
-  let rel = pathname === '/' ? 'admin.html' : pathname.replace(/^\/+/, '');
+  let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   try { rel = decodeURIComponent(rel); } catch { return text(res, 400, 'Bad request'); }
   const full = path.resolve(ROOT, rel);
   if (!full.startsWith(ROOT + path.sep) && full !== ROOT) return text(res, 403, 'Forbidden');
