@@ -113,7 +113,7 @@ function stopLocalRace({clearParticipants=false}={}){
  // 새 판/맵 변경 즉시 이전 프레임을 지워 남은 공이 화면에 잔상으로 남지 않게 한다.
  for(const id of ['raceCanvas','minimapCanvas']){const c=$(id);if(c){const g=c.getContext('2d');g?.clearRect(0,0,c.width,c.height)}}
  const card=$('winnerCard');if(card)card.classList.remove('show','burst','winner-pop');
- const names=$('winnerNames');if(names)names.innerHTML='';
+ const names=$('winnerNames');if(names){names.innerHTML='';delete names.dataset.markup;}
  renderRank.lastScrollKey='';renderRank.winnerLocked=false;lastRankCount=-1;rankNodes.clear();rankStatusCache.clear();liveRankMemory.clear();remoteBallView.clear();lastRemoteFrameTs=0;
  const rankList=$('rankList');if(rankList)rankList.replaceChildren();
 }
