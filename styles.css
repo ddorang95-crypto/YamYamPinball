@@ -854,3 +854,48 @@ body.unified .mergedEntryGroup #bulkInput{grid-column:1/4;width:100%;height:46px
 body.unified .mergedEntryGroup #bulkBtn{grid-column:4}
 body.unified .mergedEntryGroup #shuffleBtn{grid-column:5}
 @media(max-width:900px){body.unified .mergedEntryGroup{grid-template-columns:1fr 92px 1fr 76px!important}body.unified .mergedEntryGroup #ownerInput{grid-column:1}body.unified .mergedEntryGroup #saveOwner{grid-column:2}body.unified .mergedEntryGroup #nameInput{grid-column:3}body.unified .mergedEntryGroup #countInput{grid-column:4}body.unified .mergedEntryGroup #addBtn{grid-column:1/3}body.unified .mergedEntryGroup #bulkInput{grid-column:1/4}body.unified .mergedEntryGroup #bulkBtn{grid-column:4}body.unified .mergedEntryGroup #shuffleBtn{grid-column:1/-1}}
+
+
+/* v17.6 step2: 참가자 이름/추가자 이니셜 표시 + 공 개수 글자 축소 */
+.admin .participantList .ownerInitialBadge,
+body.unified .participantList .ownerInitialBadge{
+  flex:0 0 22px!important;
+  width:22px!important;
+  height:22px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border-radius:7px!important;
+  border:1px solid color-mix(in srgb,var(--personColor) 70%,#fff 15%)!important;
+  background:color-mix(in srgb,var(--personColor) 22%,rgba(4,7,18,.9))!important;
+  color:#fff!important;
+  font-size:11px!important;
+  line-height:1!important;
+  font-weight:1000!important;
+  text-shadow:0 1px 3px #000!important;
+}
+.admin .participantList .participantName,
+body.unified .participantList .participantName{
+  display:block!important;
+  flex:1 1 100px!important;
+  min-width:68px!important;
+  max-width:none!important;
+  font-size:14px!important;
+  line-height:1.15!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+}
+.admin .participantList .personBallCount{
+  min-width:40px!important;
+}
+.admin .participantList .personBallCount strong,
+body.unified .participantList .personBallCount strong{
+  font-size:14px!important;
+  line-height:1!important;
+}
+.admin .participantList .personBallCount small,
+body.unified .participantList .personBallCount small{
+  font-size:9px!important;
+  line-height:1!important;
+}
