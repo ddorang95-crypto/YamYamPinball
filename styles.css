@@ -906,3 +906,102 @@ body.unified .participantList .personBallCount small{
 body.unified .participantList .ownerInitialBadge{display:none!important}
 .admin .participantList .participantName,
 body.unified .participantList .participantName{flex:1 1 120px!important;min-width:82px!important;padding-left:2px!important}
+
+
+/* v17.6 step4: 공 내부 추가자 이니셜 + 참가자 닉네임 겹침 방지 */
+.admin .participantList,
+body.unified .participantList{
+  display:grid!important;
+  grid-template-columns:repeat(auto-fit,minmax(270px,1fr))!important;
+  gap:7px!important;
+  overflow-x:hidden!important;
+  align-items:stretch!important;
+}
+.admin .participantList .pitem,
+body.unified .participantList .pitem{
+  display:grid!important;
+  grid-template-columns:22px minmax(82px,1fr) auto!important;
+  align-items:center!important;
+  min-width:0!important;
+  width:100%!important;
+  gap:7px!important;
+  padding:6px 8px!important;
+  overflow:hidden!important;
+}
+.admin .participantList .colorDot,
+body.unified .participantList .colorDot,
+.admin .participantList .ownerInitialBadge,
+body.unified .participantList .ownerInitialBadge{
+  display:none!important;
+}
+.admin .participantList .personRank,
+body.unified .participantList .personRank{
+  grid-column:1!important;
+  width:22px!important;
+  min-width:22px!important;
+}
+.admin .participantList .participantName,
+body.unified .participantList .participantName{
+  grid-column:2!important;
+  display:block!important;
+  min-width:0!important;
+  width:100%!important;
+  max-width:100%!important;
+  padding:0!important;
+  margin:0!important;
+  font-size:14px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+}
+.admin .participantList .ballAdjust,
+body.unified .participantList .ballAdjust{
+  grid-column:3!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:flex-end!important;
+  flex-wrap:nowrap!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0!important;
+  gap:3px!important;
+  white-space:nowrap!important;
+}
+.admin .participantList .personBallCount,
+body.unified .participantList .personBallCount{
+  min-width:36px!important;
+  width:auto!important;
+}
+.admin .participantList .personBallCount strong,
+body.unified .participantList .personBallCount strong{
+  font-size:13px!important;
+}
+.admin .participantList .personBallCount small,
+body.unified .participantList .personBallCount small{
+  font-size:9px!important;
+}
+.admin .participantList .ballAdjust .countMinus,
+.admin .participantList .ballAdjust .countPlus,
+body.unified .participantList .ballAdjust .countMinus,
+body.unified .participantList .ballAdjust .countPlus{
+  width:27px!important;
+  height:28px!important;
+  padding:0!important;
+  font-size:17px!important;
+}
+.admin .participantList .ballAdjust .countSet,
+body.unified .participantList .ballAdjust .countSet{
+  height:28px!important;
+  padding:0 6px!important;
+  font-size:10px!important;
+  max-width:62px!important;
+}
+@media (min-width:1400px){
+  .admin .participantList,
+  body.unified .participantList{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))!important}
+}
+@media (max-width:850px){
+  .admin .participantList,
+  body.unified .participantList{grid-template-columns:1fr!important}
+}
