@@ -257,12 +257,14 @@ function handleAction(res, data) {
         if (raceId === room.raceId && seq >= Number(room.snapshotSeq || 0)) {
           room.snapshotSeq = seq;
           room.snapshot = {
+            packed: Number(data.packed || 0) === 1 ? 1 : 0,
             balls: Array.isArray(data.balls) ? data.balls : [],
             rot: Array.isArray(data.rot) ? data.rot : [],
             gate: Number(data.gate || 0),
             cam: Number(data.cam || 0),
             camX: Number(data.camX || 560),
             camZoom: Number(data.camZoom || 0.82),
+            sentAt: Number(data.sentAt || 0),
             seq, raceId
           };
           touch(room);
@@ -346,7 +348,28 @@ function writeRoomPacket(room, packet) {
 }
 
 function broadcastSnapshot(room) {
-  writeRoomPacket(room, { ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot });
+  const key = cleanRoom(room.code);
+  const clients = roomStreams.get(key);
+  if (!clients || !clients.size) return;
+  const payload = `data: ${JSON.stringify({ ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot })}\n\n`;
+  for (const res of [...clients]) {
+    try {
+      // 느린 관전자에게 이전 프레임을 계속 쌓지 않고 최신 프레임 하나만 보관한다.
+      if (res.__snapshotBlocked) { res.__latestSnapshot = payload; continue; }
+      const ok = res.write(payload);
+      if (!ok) {
+        res.__snapshotBlocked = true;
+        res.__latestSnapshot = null;
+        res.once('drain', () => {
+          res.__snapshotBlocked = false;
+          const latest = res.__latestSnapshot;
+          res.__latestSnapshot = null;
+          if (latest) { try { if (!res.write(latest)) res.__snapshotBlocked = true; } catch {} }
+        });
+      }
+    } catch { clients.delete(res); }
+  }
+  if (!clients.size) roomStreams.delete(key);
 }
 
 function broadcastInteraction(room, interaction) {

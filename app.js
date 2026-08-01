@@ -48,6 +48,16 @@ function applyAdminPrefs(target,map){
 const box2dFactoryPromise=import('https://cdn.jsdelivr.net/npm/box2d-wasm@7.0.0/+esm').then(m=>m.default||m).catch(e=>{console.error('Box2D 로드 실패',e);return null});
 async function api(action,data={}){const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room,action,...data})});const j=await r.json();if(!j.ok)throw Error(j.error||'오류');state=j.state;if(role==='admin'&&!unifiedMode&&selectedMapLock&&state&&!localRunning)state.map=selectedMapLock;ui();return j}
 async function apiQuiet(action,data={},timeoutMs=5000){const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),timeoutMs);try{const r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room,action,...data}),signal:ctl.signal,cache:'no-store'});if(!r.ok){let msg='통신 오류';try{const e=await r.json();msg=e.error||msg}catch{}throw Error(msg)}return await r.json()}catch(e){if(e?.name==='AbortError')throw Error('서버 응답 시간 초과');throw e}finally{clearTimeout(tm)}}
+function normalizeSnapshot(snap){
+ if(!snap||typeof snap!=='object')return snap;
+ if(Number(snap.packed||0)===1&&Array.isArray(snap.balls)){
+  snap={...snap,balls:snap.balls.map(a=>Array.isArray(a)?({ballId:a[0],name:a[1],copy:a[2],ownerInitial:a[3],x:a[4],y:a[5],done:!!a[6],qualified:!!a[7],rank:a[8]||0,vx:a[9]||0,vy:a[10]||0,waiting:!!a[11]}):a)};
+ }
+ return snap;
+}
+function packSnapshotBalls(list){
+ return list.map(b=>[b.ballId,b.name,b.copy,b.ownerInitial||ownerMark(b.owner),+b.x.toFixed(1),+b.y.toFixed(1),b.done?1:0,b.qualified?1:0,b.rank||0,+b.vx.toFixed(2),+b.vy.toFixed(2),(b.waiting||performance.now()<(b.releaseAt||0))?1:0]);
+}
 function makeLobbyState(map,{clearParticipants=false}={}){
  const base=state||{};
  return{...base,map:map||base.map||'wheel',effectProfile:'global',status:'lobby',participants:clearParticipants?[]:(base.participants||[]),finishOrder:[],winners:[],winnerDeclared:false,raceBalls:[],snapshot:{balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}};
@@ -87,7 +97,7 @@ function connectRoomEvents(){
   try{
    const packet=JSON.parse(ev.data)||{};
    if(packet.kind==='snapshot'&&packet.snapshot){
-    const snap=packet.snapshot,seq=Number(snap.seq||0);
+    const snap=normalizeSnapshot(packet.snapshot),seq=Number(snap.seq||0);
     if(seq>=lastAcceptedSnapshotSeq){
      lastAcceptedSnapshotSeq=seq;remoteSnapshotReceivedAt=performance.now();
      if(!state)state={};state.snapshot=snap;
@@ -111,7 +121,7 @@ function connectRoomEvents(){
    }
    // 제어 이벤트는 snapshot을 의도적으로 제외하므로 현재 좌표 프레임을 유지해 화면 점프를 막는다.
    if(state?.snapshot&&!incoming.snapshot)incoming.snapshot=state.snapshot;
-   const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
+   if(incoming?.snapshot)incoming.snapshot=normalizeSnapshot(incoming.snapshot);const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
    if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
    if(state?.raceBalls&&!incoming.raceBalls)incoming.raceBalls=state.raceBalls;
    const previousRace=state?.raceId;state=incoming;ui();
@@ -127,7 +137,7 @@ async function poll(){
  // 관리자 로컬 물리가 권위 소스인 동안에는 자기 스냅샷을 다시 내려받아 파싱하지 않는다.
  // 네트워크/JSON 작업이 메인 스레드를 막아 공이 중간에 멈추는 현상을 방지한다.
  if(role==='admin'&&localRunning&&sim){setTimeout(poll,350);return}
- if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(localRunning&&sim&&localRaceConfig){incoming.status='running';incoming.map=localRaceConfig.map;incoming.raceId=localRaceConfig.raceId;incoming.seed=localRaceConfig.seed;incoming.winMode=localRaceConfig.winMode;incoming.winningRanks=localRaceConfig.ranks}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(role==='admin'&&!unifiedMode&&!localRunning)applyAdminPrefs(incoming,selectedMapLock||incoming.map);const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(role==='admin'&&performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&state.raceId!==lastRace&&Number(raceHostId)===Number(state.raceId)){startPhysics();localRunning=true;localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]}}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
+ if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(localRunning&&sim&&localRaceConfig){incoming.status='running';incoming.map=localRaceConfig.map;incoming.raceId=localRaceConfig.raceId;incoming.seed=localRaceConfig.seed;incoming.winMode=localRaceConfig.winMode;incoming.winningRanks=localRaceConfig.ranks}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(role==='admin'&&!unifiedMode&&!localRunning)applyAdminPrefs(incoming,selectedMapLock||incoming.map);if(incoming?.snapshot)incoming.snapshot=normalizeSnapshot(incoming.snapshot);const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(role==='admin'&&performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&state.raceId!==lastRace&&Number(raceHostId)===Number(state.raceId)){startPhysics();localRunning=true;localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]}}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
 function parseBulk(t){return t.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.*?)(?:\s*[xX*×]\s*(\d+))?$/);return{name:(m?.[1]||'').trim(),count:Math.max(1,Number(m?.[2]||1)|0)}}).filter(x=>x.name)}
 function bindAdmin(){
  if($('soloBtn'))$('soloBtn').onclick=()=>api('setMode',{mode:'solo'});if($('groupBtn'))$('groupBtn').onclick=()=>api('setMode',{mode:'group'});if($('saveTitle')&&$('titleInput'))$('saveTitle').onclick=()=>api('setTitle',{title:$('titleInput').value});
@@ -1483,7 +1493,13 @@ function step(dt){
  if(sim.finish.length>=sim.balls.length&&!sim.completionSent){sim.completionSent=true;apiQuiet('completeRace').catch(()=>{})}
  if(sim.balls.every(b=>b.done))sim.paused=true
 }
-function sendSnapshot(){if(!sim||snapshotInFlight||resetInFlight||mutationBusy)return;const epoch=lifecycleEpoch;snapshotInFlight=true;const activeSim=sim;apiQuiet('snapshot',{seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),balls:activeSim.balls.filter(b=>!b.done||String(b.ballId)===String(activeSim.focusBallId||'')).map(b=>({ballId:b.ballId,name:b.name,copy:b.copy,owner:b.owner,ownerInitial:b.ownerInitial||ownerMark(b.owner),x:+b.x.toFixed(1),y:+b.y.toFixed(1),done:!!b.done,qualified:!!b.qualified,rank:b.rank||0,vx:+b.vx.toFixed(2),vy:+b.vy.toFixed(2),stunMs:Math.max(0,Math.round(b.stunUntil-performance.now())),impactMs:Math.max(0,Math.round(Number(b.impactUntil||0)-performance.now())),waiting:!!b.waiting||performance.now()<(b.releaseAt||0)})),rot:activeSim.map.rot.map(r=>r.a),gate:activeSim.map.gate?activeSim.map.gate.a:0,cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3)},2500).catch(()=>{}).finally(()=>{if(epoch===lifecycleEpoch)snapshotInFlight=false})}
+function sendSnapshot(){
+ if(!sim||snapshotInFlight||resetInFlight||mutationBusy)return;
+ const epoch=lifecycleEpoch,activeSim=sim,nowTs=performance.now();snapshotInFlight=true;
+ const active=activeSim.balls.filter(b=>!b.done||String(b.ballId)===String(activeSim.focusBallId||''));
+ const payload={seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),sentAt:Date.now()};
+ apiQuiet('snapshot',payload,2200).catch(()=>{}).finally(()=>{if(epoch===lifecycleEpoch)snapshotInFlight=false});
+}
 function drawMap(ctx,map,theme){ctx.strokeStyle=theme.line;ctx.lineWidth=4;ctx.shadowColor=theme.glow;ctx.shadowBlur=10;ctx.lineCap='round';for(const g of map.s){ctx.beginPath();ctx.moveTo(g.x1,g.y1);ctx.lineTo(g.x2,g.y2);ctx.stroke()}ctx.shadowBlur=0;for(const q of map.p){ctx.fillStyle=theme.peg;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill()}for(const q of map.bum){ctx.fillStyle=theme.bump;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill();ctx.strokeStyle=theme.line;ctx.lineWidth=3;ctx.stroke()}for(const q of map.kick||[]){ctx.save();ctx.translate(q.x,q.y);ctx.fillStyle=theme.bump;ctx.globalAlpha=.82;ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 25px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(q.dir>0?'➜':'➜',0,1);ctx.restore()}for(const d of map.decor||[]){ctx.save();ctx.globalAlpha=.65;ctx.font='42px Arial';ctx.textAlign='center';ctx.fillText(d.kind==='candy'?'🍭':d.kind==='cloud'?'☁️':'🍄',d.x,d.y);ctx.restore()}
  if(map.finishGateY){
   ctx.save();
@@ -1497,19 +1513,19 @@ function drawMap(ctx,map,theme){ctx.strokeStyle=theme.line;ctx.lineWidth=4;ctx.s
 const themes={wheel:{bg:'#180b25',line:'#ffb6e7',glow:'#ff7bd5',peg:'#ffe675',bump:'#ff91c8'},greed:{bg:'#100a1d',line:'#d8b6ff',glow:'#9d63ff',peg:'#ffd782',bump:'#8fffe0'},cascade:{bg:'#07182b',line:'#b8edff',glow:'#79d7ff',peg:'#fff',bump:'#a8e8ff'},maze:{bg:'#102417',line:'#bff6a8',glow:'#86e56e',peg:'#ffd36f',bump:'#ff9d72'}};
 function smoothRemoteSource(source,ts){
  if(role==='admin')return source;
- const dt=Math.min(50,Math.max(4,ts-(lastRemoteFrameTs||ts-16)));lastRemoteFrameTs=ts;
- const age=clamp(ts-(remoteSnapshotReceivedAt||ts),0,180);
- const ease=1-Math.exp(-dt/58),seen=new Set(),out=[];
+ const dt=Math.min(34,Math.max(4,ts-(lastRemoteFrameTs||ts-16)));lastRemoteFrameTs=ts;
+ const age=clamp(ts-(remoteSnapshotReceivedAt||ts),0,110);
+ const ease=1-Math.exp(-dt/34),seen=new Set(),out=[];
  for(const b of source){
   const id=String(b.ballId||b.id||b.name),vx=Number(b.vx)||0,vy=Number(b.vy)||0;
-  // 서버 프레임 사이에는 마지막 속도로 짧게 예측해 60fps로 계속 움직이고,
-  // 새 좌표가 오면 부드럽게 오차만 보정한다.
-  const predict=b.waiting?0:age*.78,targetX=Number(b.x)+vx*predict,targetY=Number(b.y)+vy*predict;
+  const predict=b.waiting?0:age*.94,targetX=Number(b.x)+vx*predict,targetY=Number(b.y)+vy*predict;
   const old=remoteBallView.get(id)||{x:targetX,y:targetY,vx,vy};
-  old.x+=(targetX-old.x)*ease;old.y+=(targetY-old.y)*ease;old.vx=vx;old.vy=vy;old.seen=ts;
+  const dx=targetX-old.x,dy=targetY-old.y,dist=Math.hypot(dx,dy);
+  if(dist>95){old.x=targetX;old.y=targetY}else{old.x+=dx*ease;old.y+=dy*ease}
+  old.vx=vx;old.vy=vy;old.seen=ts;
   remoteBallView.set(id,old);seen.add(id);out.push({...b,x:old.x,y:old.y});
  }
- for(const [id,v] of remoteBallView){if(!seen.has(id)&&ts-(v.seen||0)>700)remoteBallView.delete(id)}
+ for(const [id,v] of remoteBallView){if(!seen.has(id)&&ts-(v.seen||0)>450)remoteBallView.delete(id)}
  return out;
 }
 // v15.10aq: 사용자가 직접 복사한 욕망의 항아리 카메라 좌표.
@@ -1602,7 +1618,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(r
   const maxLoops=canvasDragFastForward?3:4;
   while(sim.acc>=physicsStep&&ffLoops<maxLoops){step(physicsStep);sim.acc-=physicsStep;ffLoops++}
   if(sim.acc>physicsStep*1.5)sim.acc=physicsStep*1.5;
-  const snapshotGap=sim.balls.length>800?260:sim.balls.length>500?220:sim.balls.length>250?170:110;if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
+  const snapshotGap=sim.balls.length>800?140:sim.balls.length>500?115:sim.balls.length>250?90:55;if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
  }
  const mh=map.worldH||H,renderBaseScale=Math.min((w-250)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
  const q=(r)=>ys.length?ys[Math.min(ys.length-1,Math.floor((ys.length-1)*r))]:mh-200;
@@ -1968,7 +1984,7 @@ function runBackgroundPhysics(){
  let loops=0;
  while(budget>=physicsStep&&loops<50){step(physicsStep);budget-=physicsStep;loops++}
  sim.last=now;sim.lastStepAt=now;
- const snapshotGap=sim.balls.length>800?260:sim.balls.length>500?220:sim.balls.length>250?170:110;
+ const snapshotGap=sim.balls.length>800?140:sim.balls.length>500?115:sim.balls.length>250?90:55;
  if(now-sim.lastSend>snapshotGap){sim.lastSend=now;sendSnapshot()}
 }
 setInterval(runBackgroundPhysics,200);
@@ -2451,3 +2467,5 @@ function init(r){if(r==='unified')bindUnified();else{role=r;if(r==='admin'){load
 // v15.10bw-fast-forward-tdz-screen-loss-fix: drawFrame에서 선언 전 winnerCinematic 참조로 발생하던 ReferenceError를 제거해 5배속 중 핀볼 화면 소실과 진행 정지를 근본 수정.
 
 // v15.10bx-fast-forward-greed-neon-wall-containment: 5배속 중 욕망의 항아리 공을 실제 좌우 네온 외곽선의 구간별 기울기 안쪽으로 제한하고, 밖으로 향한 횡속도만 흡수해 맵 이탈을 차단.
+
+// v17.7 spectator smooth sync: compact snapshots, adaptive 18fps+, SSE latest-frame coalescing, 60fps interpolation.
