@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v))
 const ADMIN_PREFS_KEY='yamyam_pinball_admin_prefs_'+room;
 // 모든 맵이 공유하는 기본 핀볼 연출 설정. 맵을 바꾸거나 경기를 초기화해도 이 값은 사라지지 않는다.
 const GLOBAL_PINBALL_EFFECTS=Object.freeze({
- winnerCloseupMs:1500,
+ winnerCloseupMs:900,
  winnerHideAfterCloseup:true,
  winnerPopupPersistent:true,
  winnerReturnToMain:true,
@@ -1478,7 +1478,7 @@ function step(dt){
    sim.finishFocusUntil=now+(isWinner&&!preResolvedLastWinner?2200:1200);
    if(isWinner&&!preResolvedLastWinner){
     // 일반 당첨 모드는 기존처럼 당첨 공 클로즈업 후 팝업을 표시한다.
-    const winnerCloseupMs=1500;
+    const winnerCloseupMs=900;
     b.finishVisualUntil=now+5200;
     delete b.winnerHideAt;
     sim.winnerResolved=true;sim.winnerResolvedAt=now;sim.winnerPopupReady=false;sim.winnerPopupReadyAt=0;sim.winnerPopupNotBefore=now+winnerCloseupMs;

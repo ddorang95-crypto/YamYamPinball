@@ -1005,3 +1005,46 @@ body.unified .participantList .ballAdjust .countSet{
   .admin .participantList,
   body.unified .participantList{grid-template-columns:1fr!important}
 }
+
+
+/* v17.11: 당첨 팝업 타이밍 단축 + 참가자 등록색 가독성 강화 */
+.admin .participantList .pitem,
+body.unified .participantList .pitem{
+  position:relative!important;
+  border:1px solid color-mix(in srgb,var(--personColor) 58%,rgba(255,255,255,.16))!important;
+  border-left:5px solid var(--personColor)!important;
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--personColor) 20%,rgba(5,9,22,.92)) 0%,
+    rgba(5,9,22,.86) 38%,
+    rgba(5,9,22,.72) 100%)!important;
+  box-shadow:inset 0 0 14px color-mix(in srgb,var(--personColor) 13%,transparent)!important;
+}
+.admin .participantList .colorDot,
+body.unified .participantList .colorDot{
+  display:inline-block!important;
+  grid-column:1!important;
+  position:absolute!important;
+  left:7px!important;
+  top:50%!important;
+  transform:translateY(-50%)!important;
+  width:9px!important;
+  height:9px!important;
+  border:2px solid rgba(255,255,255,.82)!important;
+  background:var(--personColor)!important;
+  box-shadow:0 0 8px var(--personColor)!important;
+  z-index:2!important;
+}
+.admin .participantList .personRank,
+body.unified .participantList .personRank{
+  padding-left:11px!important;
+  color:color-mix(in srgb,var(--personColor) 75%,#fff 25%)!important;
+}
+.admin .participantList .participantName,
+body.unified .participantList .participantName{
+  color:color-mix(in srgb,var(--personColor) 82%,#fff 18%)!important;
+  text-shadow:0 0 8px color-mix(in srgb,var(--personColor) 28%,transparent)!important;
+}
+.admin .participantList .personBallCount strong,
+body.unified .participantList .personBallCount strong{
+  color:color-mix(in srgb,var(--personColor) 72%,#ffe66f 28%)!important;
+}
