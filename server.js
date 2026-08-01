@@ -30,8 +30,19 @@ const cleanRoom = (value) => {
 };
 
 function emptySnapshot() {
-  return { balls: [], rot: [], gate: 0, cam: 0, camX: 560, camZoom: 0.82 };
+  return { balls: [], rot: [], gate: 0, cam: 0, camX: 560, camZoom: 0.82, seq: 0, raceId: 0 };
 }
+
+function ownerInitial(owner) {
+  const value = String(owner || '').trim().toLowerCase();
+  if (!value) return '';
+  if (value.includes('야미') || value === 'y' || value.includes('yami')) return 'Y';
+  if (value.includes('꿀혜') || value === 'g' || value.includes('ggul')) return 'G';
+  if (value.includes('선하') || value === 'm' || value.includes('seonha')) return 'M';
+  if (value.includes('도릿') || value === 'd' || value.includes('dorit')) return 'D';
+  return String(owner || '').trim().slice(0, 1).toUpperCase();
+}
+
 
 function newRoom(code) {
   const roomNames = { GROUP: '단체 핀볼', YAMI: '야미 개인 핀볼', GGULHYE: '꿀혜 개인 핀볼', SEONHA: '선하 개인 핀볼', DORIT: '도릿 개인 핀볼' };
@@ -54,7 +65,8 @@ function newRoom(code) {
     winnerDeclared: false,
     startedAt: 0,
     duration: 0,
-    updatedAt: now()
+    updatedAt: now(),
+    snapshotSeq: 0
   };
 }
 
@@ -119,7 +131,12 @@ function asRanks(values) {
 }
 
 function responseState(res, room, extra = {}) {
-  json(res, 200, { ok: true, state: room, ...extra });
+  json(res, 200, { ok: true, state: clientState(room), ...extra });
+}
+
+function clientState(room) {
+  const { raceBalls, ...rest } = room;
+  return { ...rest, raceBallCount: Array.isArray(raceBalls) ? raceBalls.length : 0 };
 }
 
 // 실시간 제어 이벤트에는 수백~수천 개 공 좌표(snapshot)를 싣지 않는다.
@@ -141,7 +158,7 @@ function handleAction(res, data) {
       let count = Math.max(1, Math.min(5000, Number(data.count) || 1));
       if (!name || name.length > 24) throw new Error('닉네임은 1~24자로 입력해 주세요.');
       if (owner.length > 40) throw new Error('멤버 이름이 너무 깁니다.');
-      room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, count, addedAt: now() });
+      room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, ownerInitial: ownerInitial(owner), count, addedAt: now() });
       backToLobby(room); touch(room); break;
     }
     case 'bulkAdd': {
@@ -150,7 +167,7 @@ function handleAction(res, data) {
       for (const item of Array.isArray(data.items) ? data.items : []) {
         const name = String(item.name || '').trim();
         const count = Math.max(1, Math.min(5000, Number(item.count) || 1));
-        if (name && name.length <= 24) room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, count, addedAt: now() });
+        if (name && name.length <= 24) room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, ownerInitial: ownerInitial(owner), count, addedAt: now() });
       }
       backToLobby(room); touch(room); break;
     }
@@ -211,7 +228,7 @@ function handleAction(res, data) {
       const balls = [];
       for (const p of room.participants) {
         for (let i = 1; i <= Number(p.count || 0); i++) {
-          balls.push({ ballId: `${p.id}_${i}`, participantId: p.id, name: p.name, owner: p.owner, copy: i });
+          balls.push({ ballId: `${p.id}_${i}`, participantId: p.id, name: p.name, owner: p.owner, ownerInitial: p.ownerInitial || ownerInitial(p.owner), copy: i });
         }
       }
       if (!balls.length) throw new Error('공을 1개 이상 추가해 주세요.');
@@ -220,6 +237,7 @@ function handleAction(res, data) {
       room.winners = [];
       room.winnerDeclared = false;
       room.snapshot = emptySnapshot();
+      room.snapshotSeq = 0;
       room.raceId += 1;
       if (!(room.seed > 0)) room.seed = randomSeed();
       room.startedAt = now() + 250;
@@ -232,15 +250,22 @@ function handleAction(res, data) {
     }
     case 'snapshot': {
       if (room.status === 'running') {
-        room.snapshot = {
-          balls: Array.isArray(data.balls) ? data.balls : [],
-          rot: Array.isArray(data.rot) ? data.rot : [],
-          gate: Number(data.gate || 0),
-          cam: Number(data.cam || 0),
-          camX: Number(data.camX || 560),
-          camZoom: Number(data.camZoom || 0.82)
-        };
-        touch(room);
+        const seq = Math.max(0, Number(data.seq) || 0);
+        const raceId = Number(data.raceId) || room.raceId;
+        // 느리게 도착한 이전 프레임이 최신 화면을 되감는 현상을 차단한다.
+        if (raceId === room.raceId && seq >= Number(room.snapshotSeq || 0)) {
+          room.snapshotSeq = seq;
+          room.snapshot = {
+            balls: Array.isArray(data.balls) ? data.balls : [],
+            rot: Array.isArray(data.rot) ? data.rot : [],
+            gate: Number(data.gate || 0),
+            cam: Number(data.cam || 0),
+            camX: Number(data.camX || 560),
+            camZoom: Number(data.camZoom || 0.82),
+            seq, raceId
+          };
+          touch(room);
+        }
       }
       break;
     }
@@ -249,7 +274,7 @@ function handleAction(res, data) {
         const id = String(data.ballId || '');
         if (!room.finishOrder.some((x) => x.ballId === id)) {
           const ball = room.raceBalls.find((x) => x.ballId === id);
-          if (ball) room.finishOrder.push({ ballId: ball.ballId, name: ball.name, copy: ball.copy, owner: ball.owner, rank: room.finishOrder.length + 1 });
+          if (ball) room.finishOrder.push({ ballId: ball.ballId, name: ball.name, copy: ball.copy, owner: ball.owner, ownerInitial: ball.ownerInitial || ownerInitial(ball.owner), rank: room.finishOrder.length + 1 });
         }
         if (!room.winnerDeclared) {
           let ready = false;
@@ -338,7 +363,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (url.pathname === '/health') return json(res, 200, { ok: true });
-    if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: getRoom(url.searchParams.get('room')) });
+    if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: clientState(getRoom(url.searchParams.get('room'))) });
     if (url.pathname === '/api/events' && req.method === 'GET') return openRoomStream(req, res, url.searchParams.get('room'));
     if (url.pathname === '/api/action' && req.method === 'POST') {
       try { return handleAction(res, await readJson(req)); }
