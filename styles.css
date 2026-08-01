@@ -875,3 +875,10 @@ body.unified .singleAddRow #countInput{flex:0 0 68px!important;width:68px!import
 body.unified .participantList .participantName{font-size:12px!important;min-width:58px!important}
 body.unified .participantList{grid-template-columns:repeat(auto-fit,minmax(185px,1fr))!important}
 @media(max-width:700px){body.unified .ownerSaveRow #ownerInput,body.unified .singleAddRow #nameInput{width:auto!important;max-width:none!important;flex:1 1 150px!important}}
+
+/* v19.2 추가자 이름 연동 및 입력창 정리 */
+body.unified .ownerSaveRow{align-items:center!important;flex-wrap:nowrap!important}
+body.unified .ownerSaveRow #ownerInput{flex:0 0 170px!important;width:170px!important;max-width:170px!important}
+body.unified .ownerSavedBadge{display:inline-flex;align-items:center;justify-content:center;min-width:82px;height:34px;padding:0 10px;border:1px solid rgba(150,130,255,.55);border-radius:9px;background:rgba(77,57,145,.35);color:#efeaff;font-size:12px;font-weight:900;white-space:nowrap}
+body.unified .ownerSavedBadge[data-mark="Y"]{border-color:#ff76c8} body.unified .ownerSavedBadge[data-mark="G"]{border-color:#7ee7ff} body.unified .ownerSavedBadge[data-mark="M"]{border-color:#ffd166} body.unified .ownerSavedBadge[data-mark="D"]{border-color:#8ff0a4}
+@media(max-width:700px){body.unified .ownerSaveRow{flex-wrap:wrap!important}body.unified .ownerSaveRow #ownerInput{flex:1 1 140px!important;width:auto!important;max-width:none!important}}

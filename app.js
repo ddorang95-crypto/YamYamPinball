@@ -235,7 +235,7 @@ function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 const mapNames={wheel:'🍭 캔디 수레바퀴',greed:'🏺 욕망의 항아리 REMIX'};
 function ui(){if(!state)return;refreshNameColors();if($('brand'))$('brand').textContent=state.title;if($('roomCode'))$('roomCode').textContent=state.code;if($('ballCount'))$('ballCount').textContent=balls().length;const modeText=state.mode==='solo'?'개인 핀볼':'단체 핀볼';if($('modeLabel'))$('modeLabel').textContent=modeText;if($('modeBadge')){$('modeBadge').textContent=modeText;$('modeBadge').className=state.mode==='solo'?'solo':'group'};if($('mapBadge'))$('mapBadge').textContent=mapNames[state.map]||state.map;const winText=state.winMode==='first'?'당첨: 첫 번째':state.winMode==='last'?'당첨: 마지막':'당첨: '+(state.winningRanks||[1]).join(', ')+'번째';if($('winBadge'))$('winBadge').textContent=winText;
  if(role==='admin'){$('titleInput').value=state.title;const fixedMap=selectedMapLock||pendingMap||state.map;selectedMapLock=mapNames[fixedMap]?fixedMap:(selectedMapLock||'wheel');$('mapSelect').value=selectedMapLock;$('mapSelect').disabled=false;const shownMode=pendingWinMode||(winDraft?.mode)||state.winMode||'first';const shownRanks=shownMode==='last'?[Math.max(1,balls().length)]:((winDraft?.ranks)||state.winningRanks||[1]);const wr=document.querySelector(`input[name=win][value=${shownMode}]`);if(wr)wr.checked=true;if(!pendingWinMode)$('rankNumber').value=shownRanks.join(',');$('rankNumber').disabled=shownMode!=='number';$('memberLink').textContent=location.origin+'/member.html?room='+state.code;if($('soloBtn'))$('soloBtn').classList.toggle('selected',state.mode==='solo');if($('groupBtn'))$('groupBtn').classList.toggle('selected',state.mode==='group');document.querySelectorAll('.winChoice').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));if($('winSaved')&&!pendingWinMode){const wt=shownMode==='first'?'당첨: 첫 번째':shownMode==='last'?'당첨: 마지막':'당첨: '+shownRanks.join(', ')+'번째';$('winSaved').textContent='현재 설정: '+wt}}
- if($('participants')){const l=(role==='member'&&!unifiedMode)?(state.participants||[]).filter(p=>p.owner===owner):(state.participants||[]),groups=new Map();for(const p of l){const key=(p.owner||'')+'\u0000'+p.name;const g=groups.get(key)||{name:p.name,owner:p.owner,total:0,ids:[]};g.total+=Number(p.count)||0;g.ids.push(p.id);groups.set(key,g)}const rows=[...groups.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ko'));$('participants').innerHTML=rows.length?rows.map((g,i)=>`<div class=pitem style="--personColor:${getNameColor(g.name,1)};--personSoft:${getNameColor(g.name,.13)}"><span class=personRank>${i+1}</span><span class=colorDot style="--dot:${getNameColor(g.name,1)}"></span><b class=participantName>${esc(g.name)} <em class=ownerInitialBadge>${esc(ownerMark(g.owner))}</em></b><div class=ballAdjust data-ids="${g.ids.join(',')}"><button class=countMinus type=button aria-label="공 1개 빼기">−</button><span class=personBallCount><strong>${g.total}</strong><small>개</small></span><button class=countPlus type=button aria-label="공 1개 추가">＋</button><button class=countSet type=button>갯수 조정</button></div></div>`).join(''):'<div class=emptyParticipants>추가된 참가자가 없습니다</div>';if($('participantSummary'))$('participantSummary').textContent=`${rows.length}명 · 총 ${rows.reduce((n,g)=>n+g.total,0)}공`;document.querySelectorAll('.ballAdjust').forEach(box=>{const ids=box.dataset.ids.split(',').filter(Boolean),current=Number(box.querySelector('.personBallCount strong')?.textContent)||0;box.querySelector('.countMinus').onclick=()=>{if(current<=1&&!confirm('이 참가자의 마지막 공까지 뺄까요?'))return;api('adjustParticipantGroup',{ids,delta:-1,owner,admin:role==='admin'})};box.querySelector('.countPlus').onclick=()=>api('adjustParticipantGroup',{ids,delta:1,owner,admin:role==='admin'});box.querySelector('.countSet').onclick=()=>{const raw=prompt('변경할 전체 공 개수를 입력해주세요. (0 입력 시 참가자 삭제)',String(current));if(raw===null)return;const count=Number(raw);if(!Number.isInteger(count)||count<0||count>5000){flash('0~5000 사이의 정수를 입력해주세요');return}if(count===0&&!confirm('이 참가자를 삭제할까요?'))return;api('adjustParticipantGroup',{ids,count,owner,admin:role==='admin'})}})}
+ if($('participants')){const l=(role==='member'&&!unifiedMode)?(state.participants||[]).filter(p=>p.owner===owner):(state.participants||[]),groups=new Map();for(const p of l){const key=(p.owner||'')+'\u0000'+p.name;const g=groups.get(key)||{name:p.name,owner:p.owner,ownerInitial:p.ownerInitial||ownerMark(p.owner),total:0,ids:[]};g.total+=Number(p.count)||0;g.ids.push(p.id);groups.set(key,g)}const rows=[...groups.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ko'));$('participants').innerHTML=rows.length?rows.map((g,i)=>`<div class=pitem style="--personColor:${getNameColor(g.name,1)};--personSoft:${getNameColor(g.name,.13)}"><span class=personRank>${i+1}</span><span class=colorDot style="--dot:${getNameColor(g.name,1)}"></span><b class=participantName>${esc(g.name)} <em class=ownerInitialBadge title="추가자: ${esc(g.owner||'미지정')}">${esc(g.ownerInitial||'?')}</em></b><div class=ballAdjust data-ids="${g.ids.join(',')}"><button class=countMinus type=button aria-label="공 1개 빼기">−</button><span class=personBallCount><strong>${g.total}</strong><small>개</small></span><button class=countPlus type=button aria-label="공 1개 추가">＋</button><button class=countSet type=button>갯수 조정</button></div></div>`).join(''):'<div class=emptyParticipants>추가된 참가자가 없습니다</div>';if($('participantSummary'))$('participantSummary').textContent=`${rows.length}명 · 총 ${rows.reduce((n,g)=>n+g.total,0)}공`;document.querySelectorAll('.ballAdjust').forEach(box=>{const ids=box.dataset.ids.split(',').filter(Boolean),current=Number(box.querySelector('.personBallCount strong')?.textContent)||0;box.querySelector('.countMinus').onclick=()=>{if(current<=1&&!confirm('이 참가자의 마지막 공까지 뺄까요?'))return;api('adjustParticipantGroup',{ids,delta:-1,owner,admin:role==='admin'})};box.querySelector('.countPlus').onclick=()=>api('adjustParticipantGroup',{ids,delta:1,owner,admin:role==='admin'});box.querySelector('.countSet').onclick=()=>{const raw=prompt('변경할 전체 공 개수를 입력해주세요. (0 입력 시 참가자 삭제)',String(current));if(raw===null)return;const count=Number(raw);if(!Number.isInteger(count)||count<0||count>5000){flash('0~5000 사이의 정수를 입력해주세요');return}if(count===0&&!confirm('이 참가자를 삭제할까요?'))return;api('adjustParticipantGroup',{ids,count,owner,admin:role==='admin'})}})}
  renderWinner();}
 function hash(s){let h=2166136261;for(let c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 // 원본 Marble Roulette처럼 참가자 순서 전체를 360도 색상환에 균등 분배한다.
@@ -2285,12 +2285,52 @@ function bindUnified(){
  unifiedMode=true;role='admin';selectedMapLock=null;
  loadAdminPrefs();bindAdmin();
  owner=localStorage.getItem('pin_owner_'+room)||localStorage.getItem('pin_owner')||'';
- const ownerEl=$('ownerInput');if(ownerEl)ownerEl.value=owner;
- const currentOwner=()=>{const typed=ownerEl?.value.trim()||owner||'';return typed||'?'};
- const persistOwner=()=>{owner=ownerEl?.value.trim()||'';if(owner){localStorage.setItem('pin_owner_'+room,owner);localStorage.setItem('pin_owner',owner);flash(`${ownerMark(owner)} · 이름 저장 완료`)}else{localStorage.removeItem('pin_owner_'+room);owner='';flash('이름 미지정 · 추가 공에는 ?가 표시됩니다')}};
- const saveOwnerBtn=$('saveOwner');if(saveOwnerBtn)saveOwnerBtn.onclick=persistOwner;
- const addOne=()=>{const n=$('nameInput')?.value.trim()||'',c=+$('countInput')?.value||1,who=currentOwner();if(!n){flash('참가 닉네임을 입력해주세요');return}api('addParticipant',{name:n,count:c,owner:who}).then(()=>{if($('nameInput'))$('nameInput').value='';flash(`${ownerMark(who)} · 참가자 추가 완료`)}).catch(e=>flash(e.message||'등록 오류'))};
- const addBulk=()=>{const items=parseBulk($('bulkInput')?.value||''),who=currentOwner();if(!items.length){flash('일괄 추가할 이름을 입력해주세요');return}api('bulkAdd',{items,owner:who}).then(()=>{if($('bulkInput'))$('bulkInput').value='';flash(`${ownerMark(who)} · ${items.length}명 일괄 추가 완료`)}).catch(e=>flash(e.message||'일괄 추가 오류'))};
+ const ownerEl=$('ownerInput'),ownerBadge=$('ownerSavedBadge');
+ if(ownerEl)ownerEl.value=owner;
+ const normalizeOwner=(value)=>{
+  const raw=String(value||'').trim();
+  const v=raw.toLowerCase();
+  if(!raw)return'';
+  if(v==='y'||v.includes('야미')||v.includes('yami'))return'야미';
+  if(v==='g'||v.includes('꿀혜')||v.includes('ggul'))return'꿀혜';
+  if(v==='m'||v.includes('선하')||v.includes('seonha'))return'선하';
+  if(v==='d'||v.includes('도릿')||v.includes('dorit'))return'도릿';
+  return raw;
+ };
+ const updateOwnerBadge=()=>{
+  const typed=normalizeOwner(ownerEl?.value||owner||'');
+  if(ownerBadge){ownerBadge.textContent=typed?`${typed} (${ownerMark(typed)})`:'미지정 (?)';ownerBadge.dataset.mark=typed?ownerMark(typed):'?'}
+ };
+ const persistOwner=({silent=false}={})=>{
+  owner=normalizeOwner(ownerEl?.value||'');
+  if(ownerEl)ownerEl.value=owner;
+  if(owner){localStorage.setItem('pin_owner_'+room,owner);localStorage.setItem('pin_owner',owner);if(!silent)flash(`${ownerMark(owner)} · ${owner} 이름 저장 완료`)}
+  else{localStorage.removeItem('pin_owner_'+room);localStorage.removeItem('pin_owner');if(!silent)flash('이름 미지정 · 추가 공에는 ?가 표시됩니다')}
+  updateOwnerBadge();
+  return owner||'?';
+ };
+ const currentOwner=()=>persistOwner({silent:true});
+ updateOwnerBadge();
+ if(ownerEl){ownerEl.addEventListener('input',updateOwnerBadge);ownerEl.addEventListener('change',()=>persistOwner({silent:true}));ownerEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();persistOwner()}})}
+ const saveOwnerBtn=$('saveOwner');if(saveOwnerBtn)saveOwnerBtn.onclick=()=>persistOwner();
+ const addOne=async()=>{
+  const n=$('nameInput')?.value.trim()||'',c=+$('countInput')?.value||1,who=currentOwner();
+  if(!n){flash('참가 닉네임을 입력해주세요');return}
+  try{const j=await api('addParticipant',{name:n,count:c,owner:who});if($('nameInput'))$('nameInput').value='';state=j.state;ui();flash(`${ownerMark(who)} · 참가자 추가 완료`)}catch(e){flash(e.message||'등록 오류')}
+ };
+ const addBulk=async()=>{
+  const field=$('bulkInput'),raw=field?.value||'',items=parseBulk(raw),who=currentOwner();
+  if(!items.length){flash('일괄 추가할 이름을 입력해주세요');return}
+  const btn=$('bulkBtn');if(btn){btn.disabled=true;btn.textContent='추가 중…'}
+  try{
+   const j=await api('bulkAdd',{items,owner:who});
+   state=j.state;ui();
+   // 서버에 정상 반영된 뒤에만 입력창을 비운다.
+   if(field)field.value='';
+   flash(`${ownerMark(who)} · ${items.length}명 일괄 추가 완료`);
+  }catch(e){flash(e.message||'일괄 추가 오류')}
+  finally{if(btn){btn.disabled=false;btn.textContent='일괄 추가'}}
+ };
  if($('addBtn'))$('addBtn').onclick=addOne;
  if($('bulkBtn'))$('bulkBtn').onclick=addBulk;
  const nameEl=$('nameInput');if(nameEl)nameEl.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addOne()}});
