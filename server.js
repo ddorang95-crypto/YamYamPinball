@@ -122,6 +122,13 @@ function responseState(res, room, extra = {}) {
   json(res, 200, { ok: true, state: room, ...extra });
 }
 
+// 실시간 제어 이벤트에는 수백~수천 개 공 좌표(snapshot)를 싣지 않는다.
+// 좌표는 /api/state 폴링으로만 받고, 맵/참가자/결과 이벤트는 가볍게 전파한다.
+function eventState(room) {
+  const { snapshot, raceBalls, ...rest } = room;
+  return { ...rest, snapshotVersion: room.updatedAt, raceBallCount: Array.isArray(raceBalls) ? raceBalls.length : 0 };
+}
+
 function handleAction(res, data) {
   const room = getRoom(data.room);
   const action = String(data.action || '');
@@ -274,6 +281,12 @@ function handleAction(res, data) {
   }
 
   if (action !== 'snapshot') broadcastRoom(room);
+
+  // 고빈도 요청은 거대한 room 전체를 다시 JSON 직렬화하지 않는다.
+  // 이것이 관리자 물리 루프까지 막아 공이 멈춰 보이던 주원인이었다.
+  if (action === 'snapshot' || action === 'finishBall' || action === 'completeRace') {
+    return json(res, 200, { ok: true, updatedAt: room.updatedAt, status: room.status, winnerDeclared: room.winnerDeclared });
+  }
   responseState(res, room);
 }
 
@@ -282,7 +295,7 @@ function broadcastRoom(room) {
   const key = cleanRoom(room.code);
   const clients = roomStreams.get(key);
   if (!clients || !clients.size) return;
-  const payload = `data: ${JSON.stringify({ ok: true, state: room })}\n\n`;
+  const payload = `data: ${JSON.stringify({ ok: true, state: eventState(room) })}\n\n`;
   for (const res of [...clients]) {
     try { res.write(payload); } catch { clients.delete(res); }
   }
