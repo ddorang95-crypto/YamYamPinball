@@ -68,7 +68,8 @@ function newRoom(code) {
     duration: 0,
     updatedAt: now(),
     snapshotSeq: 0,
-    interactionSeq: 0
+    interactionSeq: 0,
+    resetSeq: 0
   };
 }
 
@@ -88,6 +89,7 @@ function backToLobby(room) {
   room.snapshot = emptySnapshot();
   room.startedAt = 0;
   room.duration = 0;
+  room.resetSeq = Number(room.resetSeq || 0) + 1;
 }
 
 function randomSeed() {

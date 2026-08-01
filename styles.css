@@ -864,3 +864,14 @@ body.unified .participantList .countMinus,body.unified .participantList .countPl
 body.unified .participantList .countSet{min-height:31px!important;height:31px!important;padding:0 7px!important;font-size:10px!important}
 @media(max-width:1100px){body.unified .adminGrid{grid-template-columns:1fr 1fr!important}.combinedJoinGroup{grid-column:1/-1!important}}
 @media(max-width:700px){body.unified .adminGrid{grid-template-columns:1fr!important}.ownerSaveRow,.singleAddRow,.bulkActionRow{flex-wrap:wrap}.ownerSaveRow input,.singleAddRow input{flex:1 1 140px!important}}
+
+
+/* v19.1 stability rollback + compact linked-name input */
+body.unified .ownerSaveRow{justify-content:flex-start!important}
+body.unified .ownerSaveRow #ownerInput{flex:0 1 230px!important;width:230px!important;max-width:230px!important}
+body.unified .ownerSaveRow #saveOwner{flex:0 0 auto!important;white-space:nowrap}
+body.unified .singleAddRow #nameInput{flex:0 1 260px!important;width:260px!important;max-width:260px!important}
+body.unified .singleAddRow #countInput{flex:0 0 68px!important;width:68px!important}
+body.unified .participantList .participantName{font-size:12px!important;min-width:58px!important}
+body.unified .participantList{grid-template-columns:repeat(auto-fit,minmax(185px,1fr))!important}
+@media(max-width:700px){body.unified .ownerSaveRow #ownerInput,body.unified .singleAddRow #nameInput{width:auto!important;max-width:none!important;flex:1 1 150px!important}}
