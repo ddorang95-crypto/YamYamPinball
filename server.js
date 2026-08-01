@@ -35,11 +35,12 @@ function emptySnapshot() {
 
 function ownerInitial(owner) {
   const value = String(owner || '').trim().toLowerCase();
-  if (!value) return '';
+  if (!value) return '?';
   if (value.includes('야미') || value === 'y' || value.includes('yami')) return 'Y';
   if (value.includes('꿀혜') || value === 'g' || value.includes('ggul')) return 'G';
   if (value.includes('선하') || value === 'm' || value.includes('seonha')) return 'M';
   if (value.includes('도릿') || value === 'd' || value.includes('dorit')) return 'D';
+  if (value === '?') return '?';
   return String(owner || '').trim().slice(0, 1).toUpperCase();
 }
 
@@ -155,7 +156,7 @@ function handleAction(res, data) {
     case 'addParticipant': {
       if (room.status === 'running') throw new Error('레이스 진행 중에는 추가할 수 없습니다.');
       const name = String(data.name || '').trim();
-      const owner = String(data.owner || '').trim();
+      const owner = String(data.owner || '').trim() || '?';
       let count = Math.max(1, Math.min(5000, Number(data.count) || 1));
       if (!name || name.length > 24) throw new Error('닉네임은 1~24자로 입력해 주세요.');
       if (owner.length > 40) throw new Error('멤버 이름이 너무 깁니다.');
@@ -164,7 +165,7 @@ function handleAction(res, data) {
     }
     case 'bulkAdd': {
       if (room.status === 'running') throw new Error('레이스 진행 중에는 추가할 수 없습니다.');
-      const owner = String(data.owner || '').trim();
+      const owner = String(data.owner || '').trim() || '?';
       for (const item of Array.isArray(data.items) ? data.items : []) {
         const name = String(item.name || '').trim();
         const count = Math.max(1, Math.min(5000, Number(item.count) || 1));

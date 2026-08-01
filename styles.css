@@ -838,3 +838,29 @@ body.unified #msg{grid-column:1/-1}
 @media(max-width:700px){body.unified .adminGrid{grid-template-columns:1fr!important}.roomTabs{justify-content:flex-start}.stage aside{width:31%!important}.stage #raceCanvas{width:100%!important}}
 .remoteActivated{animation:remoteActivatedPulse .42s ease-out!important}
 @keyframes remoteActivatedPulse{0%{box-shadow:0 0 0 0 rgba(255,255,255,.95);filter:brightness(1.8)}100%{box-shadow:0 0 0 14px rgba(255,255,255,0);filter:brightness(1)}}
+
+
+/* v18 unified input consolidation + compact participant names */
+body.unified .unifiedBottom{grid-template-columns:1fr!important;grid-template-rows:auto minmax(100px,auto)!important}
+body.unified .adminGrid{grid-column:1!important;grid-row:1!important;grid-template-columns:1.65fr 1.05fr 1fr!important}
+body.unified .combinedJoinGroup{display:grid!important;grid-template-columns:1fr!important;gap:6px!important;padding:9px!important}
+body.unified .ownerSaveRow,body.unified .singleAddRow,body.unified .bulkActionRow{display:flex;gap:6px;min-width:0}
+body.unified .ownerSaveRow input,body.unified .singleAddRow input{min-width:0;flex:1 1 auto}
+body.unified .singleAddRow #countInput{flex:0 0 72px}
+body.unified .combinedJoinGroup textarea{height:50px!important;min-height:50px!important;resize:vertical}
+body.unified .ownerHint{font-size:11px;opacity:.72;line-height:1.25}
+body.unified .participantBoard{grid-column:1!important;grid-row:2!important;min-height:105px!important;max-height:175px!important}
+body.unified .participantList{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;gap:4px!important;padding:5px!important;max-height:140px!important}
+body.unified .participantList .pitem{display:flex!important;align-items:center!important;min-width:0!important;min-height:42px!important;padding:4px 6px!important;gap:5px!important}
+body.unified .participantList .participantName{display:block!important;flex:1 1 auto!important;min-width:42px!important;max-width:none!important;font-size:13px!important;line-height:1.1!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;color:#fff!important}
+body.unified .ownerInitialBadge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#6d59e8;color:#fff;font-style:normal;font-size:10px;font-weight:900;vertical-align:middle}
+body.unified .participantList .personRank{font-size:10px!important;min-width:17px!important}
+body.unified .participantList .colorDot{width:8px!important;height:8px!important;flex:0 0 8px!important}
+body.unified .participantList .ballAdjust{gap:3px!important;flex:0 0 auto!important}
+body.unified .participantList .personBallCount{min-width:38px!important}
+body.unified .participantList .personBallCount strong{font-size:16px!important}
+body.unified .participantList .personBallCount small{font-size:10px!important}
+body.unified .participantList .countMinus,body.unified .participantList .countPlus{width:29px!important;min-width:29px!important;height:31px!important;min-height:31px!important;padding:0!important;font-size:15px!important}
+body.unified .participantList .countSet{min-height:31px!important;height:31px!important;padding:0 7px!important;font-size:10px!important}
+@media(max-width:1100px){body.unified .adminGrid{grid-template-columns:1fr 1fr!important}.combinedJoinGroup{grid-column:1/-1!important}}
+@media(max-width:700px){body.unified .adminGrid{grid-template-columns:1fr!important}.ownerSaveRow,.singleAddRow,.bulkActionRow{flex-wrap:wrap}.ownerSaveRow input,.singleAddRow input{flex:1 1 140px!important}}
