@@ -1,6 +1,6 @@
 {
-  "name": "yamyam-pinball",
-  "version": "21.0.0",
+  "name": "yamyam-pinball-unified",
+  "version": "17.2.0",
   "private": true,
   "scripts": {
     "start": "node server.js"

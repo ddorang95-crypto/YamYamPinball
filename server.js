@@ -1,51 +1,418 @@
-const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
-const ROOT=__dirname,PORT=Number(process.env.PORT||10000),rooms=new Map(),streams=new Map(),now=()=>Date.now();
-const clean=s=>String(s||'COMMON').replace(/[^A-Za-z0-9_-]/g,'').toUpperCase()||'COMMON',sid=()=>crypto.randomBytes(12).toString('hex'),snap=()=>({balls:[],rot:[],gate:0,cam:0,camX:560,camZoom:.82});
-function fresh(code){return{code,mode:'group',title:'Yamyam Marble Pinball',map:'wheel',status:'lobby',participants:[],winMode:'first',winningRanks:[1],raceBalls:[],finishOrder:[],winners:[],snapshot:snap(),raceId:0,seed:1,shuffleNonce:0,winnerDeclared:false,startedAt:0,duration:0,paused:false,pausedAt:0,leaderId:'',leaderBeat:0,updatedAt:now()}}
-function R(c){c=clean(c);if(!rooms.has(c))rooms.set(c,fresh(c));return rooms.get(c)}function touch(r){r.updatedAt=now()}function lobby(r){r.status='lobby';r.raceBalls=[];r.finishOrder=[];r.winners=[];r.winnerDeclared=false;r.snapshot=snap();r.startedAt=0;r.paused=false;r.pausedAt=0;r.leaderId='';r.leaderBeat=0}
-function meta(r){let x={...r};delete x.raceBalls;delete x.snapshot;return x}function leaderAlive(r){return r.leaderId&&now()-r.leaderBeat<5500}function leader(r,c){if(c&&(!leaderAlive(r)||r.leaderId===c)){r.leaderId=c;r.leaderBeat=now()}return r.leaderId}
-function send(res,s,o){let b=Buffer.from(JSON.stringify(o));res.writeHead(s,{'Content-Type':'application/json; charset=utf-8','Content-Length':b.length,'Cache-Control':'no-store'});res.end(b)}
-function body(req){return new Promise((ok,no)=>{let s='';req.on('data',d=>s+=d);req.on('end',()=>{try{ok(s?JSON.parse(s):{})}catch(e){no(e)}});req.on('error',no)})}
+'use strict';
 
-function streamSet(code){code=clean(code);if(!streams.has(code))streams.set(code,new Set());return streams.get(code)}
-function pushRoom(r){
- const payload=`data: ${JSON.stringify({state:meta(r),serverNow:now()})}\n\n`;
- for(const res of [...streamSet(r.code)]){try{res.write(payload)}catch(_){streamSet(r.code).delete(res)}}
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
+const PORT = Number(process.env.PORT || 8787);
+const ROOT = __dirname;
+const rooms = new Map();
+const roomStreams = new Map();
+
+const mime = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.txt': 'text/plain; charset=utf-8'
+};
+
+const now = () => Date.now();
+const cleanRoom = (value) => {
+  const code = String(value || 'YAMYAM').replace(/[^A-Za-z0-9_-]/g, '').toUpperCase();
+  return code || 'YAMYAM';
+};
+
+function emptySnapshot() {
+  return { balls: [], rot: [], gate: 0, cam: 0, camX: 560, camZoom: 0.82, seq: 0, raceId: 0 };
 }
-async function act(d){let r=R(d.room),a=String(d.action||''),cid=String(d.clientId||'');
- if(a==='addParticipant'||a==='bulkAdd'){if(r.status==='running')throw Error('Race is running.');let items=a==='bulkAdd'?(d.items||[]):[{name:d.name,count:d.count}],owner=String(d.owner||'').slice(0,40);for(let q of items){let name=String(q.name||'').trim();if(name&&name.length<=24)r.participants.push({id:sid(),name,owner,count:Math.max(1,Math.min(100000,Number(q.count)||1)),addedAt:now()})}lobby(r);touch(r)}
- else if(a==='removeParticipant'||a==='removeParticipants'){if(r.status==='running')throw Error('Race is running.');let ids=new Set(a==='removeParticipant'?[String(d.id)]:(d.ids||[]).map(String));r.participants=r.participants.filter(p=>!ids.has(String(p.id)));lobby(r);touch(r)}
- else if(a==='adjustParticipantGroup'){if(r.status==='running')throw Error('Race is running.');let ids=new Set((d.ids||[]).map(String)),m=r.participants.filter(p=>ids.has(String(p.id)));if(!m.length)throw Error('Participant not found.');let cur=m.reduce((n,p)=>n+Number(p.count||0),0),t=d.count!=null?Number(d.count):cur+Number(d.delta||0);t=Math.max(0,Math.min(100000,Math.trunc(t)));let keep=m[0].id;if(!t)r.participants=r.participants.filter(p=>!ids.has(String(p.id)));else{r.participants.forEach(p=>{if(p.id===keep)p.count=t});r.participants=r.participants.filter(p=>p.id===keep||!ids.has(String(p.id)))}lobby(r);touch(r)}
- else if(a==='setMode'){r.mode=d.mode;touch(r)}else if(a==='setTitle'){r.title=String(d.title||'').slice(0,50);touch(r)}
- else if(a==='setMap'){r.map=d.map;lobby(r);r.shuffleNonce++;r.seed=100000+Math.floor(Math.random()*2147383000);touch(r)}
- else if(a==='setWin'){r.winMode=d.winMode;r.winningRanks=d.winMode==='number'?[...new Set((d.ranks||[]).map(Number).filter(x=>x>0))]:[1];touch(r);return{ok:true,winMode:r.winMode,winningRanks:r.winningRanks,updatedAt:r.updatedAt}}
- else if(a==='shuffle'){if(r.status==='running')throw Error('Race is running.');lobby(r);r.shuffleNonce++;r.seed=100000+Math.floor(Math.random()*2147383000);touch(r)}
- else if(a==='startRace'){if(d.map)r.map=d.map;if(d.winMode){r.winMode=d.winMode;r.winningRanks=d.winMode==='number'?[...new Set((d.ranks||[]).map(Number).filter(x=>x>0))]:[1]}let balls=[];for(let p of r.participants)for(let i=1;i<=p.count;i++)balls.push({ballId:p.id+'_'+i,participantId:p.id,name:p.name,owner:p.owner,copy:i});if(!balls.length)throw Error('At least 1 ball is required.');r.raceBalls=balls;r.finishOrder=[];r.winners=[];r.winnerDeclared=false;r.snapshot=snap();r.raceId++;r.startedAt=now()+1800;r.status='running';r.paused=false;r.leaderId=cid;r.leaderBeat=now();touch(r);return{ok:true,raceId:r.raceId,seed:r.seed,status:r.status,map:r.map,winMode:r.winMode,winningRanks:r.winningRanks,startedAt:r.startedAt,leaderId:r.leaderId}}
- else if(a==='heartbeat'){if(r.status==='running')leader(r,cid);return{ok:true,leaderId:r.leaderId,paused:r.paused,updatedAt:r.updatedAt}}
- else if(a==='snapshot'){if(r.status==='running'&&leader(r,cid)===cid&&!r.paused){r.snapshot={balls:d.balls||[],rot:d.rot||[],gate:Number(d.gate)||0,cam:Number(d.cam)||0,camX:Number(d.camX)||560,camZoom:Number(d.camZoom)||.82};touch(r)}return{ok:true,leaderId:r.leaderId}}
- else if(a==='finishBall'){if(r.status==='running'&&leader(r,cid)===cid){let id=String(d.ballId);if(!r.finishOrder.some(x=>x.ballId===id)){let b=r.raceBalls.find(x=>x.ballId===id);if(b)r.finishOrder.push({ballId:b.ballId,name:b.name,copy:b.copy,owner:b.owner,rank:r.finishOrder.length+1})}if(!r.winnerDeclared){let ready=r.winMode==='first'?r.finishOrder.length>=1:r.winMode==='last'?r.finishOrder.length>=r.raceBalls.length:r.finishOrder.length>=Math.max(...r.winningRanks);if(ready){r.winners=r.winMode==='first'?[r.finishOrder[0]]:r.winMode==='last'?[r.finishOrder.at(-1)]:r.winningRanks.map(k=>r.finishOrder[k-1]).filter(Boolean);r.winnerDeclared=true}}touch(r)}return{ok:true}}
- else if(a==='pauseRace'){if(r.status==='running'){r.paused=true;r.pausedAt=now();touch(r)}}else if(a==='resumeRace'){if(r.status==='running'&&r.paused){r.startedAt+=now()-r.pausedAt;r.paused=false;r.pausedAt=0;touch(r)}}
- else if(a==='completeRace'){if(r.status==='running'&&leader(r,cid)===cid){r.status='completed';touch(r)}}else if(a==='resetRace'){lobby(r);r.shuffleNonce++;r.seed=100000+Math.floor(Math.random()*2147383000);touch(r)}
- else if(a==='clearParticipants'){lobby(r);r.participants=[];r.shuffleNonce++;r.seed=100000+Math.floor(Math.random()*2147383000);touch(r)}else throw Error('Unknown action.');
- return{ok:true,state:r}}
-const mime={'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png'};
-http.createServer(async(req,res)=>{try{let u=new URL(req.url,'http://x'),p=decodeURIComponent(u.pathname);
- if(p==='/health'){res.writeHead(200);return res.end('ok')}if(p==='/api/meta')return send(res,200,{ok:true,state:meta(R(u.searchParams.get('room'))),serverNow:now()});
- if(p==='/api/state')return send(res,200,{ok:true,state:R(u.searchParams.get('room'))});if(p==='/api/checkpoint'){let r=R(u.searchParams.get('room'));return send(res,200,{ok:true,raceId:r.raceId,status:r.status,paused:r.paused,snapshot:r.snapshot,updatedAt:r.updatedAt,serverNow:now()})}
- if(p==='/api/action'&&req.method==='POST'){
-   try{
-    const d=await body(req),result=await act(d),r=R(d.room);
-    if(!['snapshot','heartbeat'].includes(String(d.action||'')))pushRoom(r);
-    if(['finishBall','completeRace'].includes(String(d.action||'')))pushRoom(r);
-    return send(res,200,{...result,serverNow:now()})
-   }catch(e){return send(res,400,{ok:false,error:e.message})}
- }
- if(p==='/api/events'){
-   const code=clean(u.searchParams.get('room')),set=streamSet(code);
-   res.writeHead(200,{'Content-Type':'text/event-stream; charset=utf-8','Cache-Control':'no-cache, no-transform','Connection':'keep-alive','X-Accel-Buffering':'no'});
-   res.write(`retry: 1000\ndata: ${JSON.stringify({state:meta(R(code)),serverNow:now()})}\n\n`);
-   set.add(res);const ping=setInterval(()=>{try{res.write(': ping\\n\\n')}catch(_){}},15000);
-   req.on('close',()=>{clearInterval(ping);set.delete(res)});return;
- }
- if(p==='/')p='/index.html';let f=path.resolve(ROOT,'.'+p);if(!f.startsWith(ROOT)||!fs.existsSync(f)||!fs.statSync(f).isFile()){res.writeHead(404);return res.end('Not found')}let b=fs.readFileSync(f);res.writeHead(200,{'Content-Type':mime[path.extname(f)]||'application/octet-stream','Cache-Control':'no-store'});res.end(b)
- }catch(e){send(res,500,{ok:false,error:e.message})}}).listen(PORT,'0.0.0.0',()=>console.log('Yamyam Pinball v21 on '+PORT));
+
+function ownerInitial(owner) {
+  const value = String(owner || '').trim().toLowerCase();
+  if (!value) return '';
+  if (value.includes('야미') || value === 'y' || value.includes('yami')) return 'Y';
+  if (value.includes('꿀혜') || value === 'g' || value.includes('ggul')) return 'G';
+  if (value.includes('선하') || value === 'm' || value.includes('seonha')) return 'M';
+  if (value.includes('도릿') || value === 'd' || value.includes('dorit')) return 'D';
+  return String(owner || '').trim().slice(0, 1).toUpperCase();
+}
+
+
+function newRoom(code) {
+  const roomNames = { GROUP: '단체 핀볼', YAMI: '야미 개인 핀볼', GGULHYE: '꿀혜 개인 핀볼', SEONHA: '선하 개인 핀볼', DORIT: '도릿 개인 핀볼' };
+  return {
+    code,
+    mode: code === 'GROUP' ? 'group' : 'solo',
+    title: roomNames[code] || 'Yamyam Marble Pinball',
+    map: 'wheel',
+    status: 'lobby',
+    participants: [],
+    winMode: 'first',
+    winningRanks: [1],
+    raceBalls: [],
+    finishOrder: [],
+    winners: [],
+    snapshot: emptySnapshot(),
+    raceId: 0,
+    seed: 1,
+    shuffleNonce: 0,
+    winnerDeclared: false,
+    startedAt: 0,
+    duration: 0,
+    updatedAt: now(),
+    snapshotSeq: 0,
+    interactionSeq: 0
+  };
+}
+
+function getRoom(code) {
+  const key = cleanRoom(code);
+  if (!rooms.has(key)) rooms.set(key, newRoom(key));
+  return rooms.get(key);
+}
+
+function touch(room) { room.updatedAt = now(); }
+function backToLobby(room) {
+  room.status = 'lobby';
+  room.raceBalls = [];
+  room.finishOrder = [];
+  room.winners = [];
+  room.winnerDeclared = false;
+  room.snapshot = emptySnapshot();
+  room.startedAt = 0;
+  room.duration = 0;
+}
+
+function randomSeed() {
+  return crypto.randomInt(100000, 2147483000);
+}
+
+function json(res, status, value) {
+  const body = Buffer.from(JSON.stringify(value));
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store, no-cache, must-revalidate'
+  });
+  res.end(body);
+}
+
+function text(res, status, value, type = 'text/plain; charset=utf-8') {
+  const body = Buffer.from(String(value));
+  res.writeHead(status, {
+    'Content-Type': type,
+    'Content-Length': body.length,
+    'Cache-Control': 'no-store, no-cache, must-revalidate'
+  });
+  res.end(body);
+}
+
+async function readJson(req) {
+  const chunks = [];
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > 2 * 1024 * 1024) throw new Error('요청 데이터가 너무 큽니다.');
+    chunks.push(chunk);
+  }
+  if (!chunks.length) return {};
+  return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+}
+
+function asRanks(values) {
+  return [...new Set((Array.isArray(values) ? values : [])
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0))].sort((a, b) => a - b);
+}
+
+function responseState(res, room, extra = {}) {
+  json(res, 200, { ok: true, state: clientState(room), ...extra });
+}
+
+function clientState(room) {
+  const { raceBalls, ...rest } = room;
+  return { ...rest, raceBallCount: Array.isArray(raceBalls) ? raceBalls.length : 0 };
+}
+
+// 실시간 제어 이벤트에는 수백~수천 개 공 좌표(snapshot)를 싣지 않는다.
+// 좌표는 /api/state 폴링으로만 받고, 맵/참가자/결과 이벤트는 가볍게 전파한다.
+function eventState(room) {
+  const { snapshot, raceBalls, ...rest } = room;
+  return { ...rest, snapshotVersion: room.updatedAt, raceBallCount: Array.isArray(raceBalls) ? raceBalls.length : 0 };
+}
+
+function handleAction(res, data) {
+  const room = getRoom(data.room);
+  const action = String(data.action || '');
+
+  switch (action) {
+    case 'addParticipant': {
+      if (room.status === 'running') throw new Error('레이스 진행 중에는 추가할 수 없습니다.');
+      const name = String(data.name || '').trim();
+      const owner = String(data.owner || '').trim();
+      let count = Math.max(1, Math.min(5000, Number(data.count) || 1));
+      if (!name || name.length > 24) throw new Error('닉네임은 1~24자로 입력해 주세요.');
+      if (owner.length > 40) throw new Error('멤버 이름이 너무 깁니다.');
+      room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, ownerInitial: ownerInitial(owner), count, addedAt: now() });
+      backToLobby(room); touch(room); break;
+    }
+    case 'bulkAdd': {
+      if (room.status === 'running') throw new Error('레이스 진행 중에는 추가할 수 없습니다.');
+      const owner = String(data.owner || '').trim();
+      for (const item of Array.isArray(data.items) ? data.items : []) {
+        const name = String(item.name || '').trim();
+        const count = Math.max(1, Math.min(5000, Number(item.count) || 1));
+        if (name && name.length <= 24) room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, ownerInitial: ownerInitial(owner), count, addedAt: now() });
+      }
+      backToLobby(room); touch(room); break;
+    }
+    case 'adjustParticipantGroup': {
+      if (room.status === 'running') throw new Error('레이스 진행 중에는 변경할 수 없습니다.');
+      const ids = new Set((Array.isArray(data.ids) ? data.ids : []).map(String));
+      const owner = String(data.owner || '');
+      const admin = Boolean(data.admin);
+      const matches = room.participants.filter((p) => ids.has(String(p.id)) && (admin || p.owner === owner));
+      if (!matches.length) throw new Error('참가자를 찾을 수 없습니다.');
+      const current = matches.reduce((sum, p) => sum + Number(p.count || 0), 0);
+      const target = Math.max(0, Math.min(5000, data.count != null ? Number(data.count) : current + Number(data.delta || 0)));
+      const keepId = matches[0].id;
+      if (target === 0) room.participants = room.participants.filter((p) => !(ids.has(String(p.id)) && (admin || p.owner === owner)));
+      else {
+        room.participants = room.participants.filter((p) => p.id === keepId || !(ids.has(String(p.id)) && (admin || p.owner === owner)));
+        const kept = room.participants.find((p) => p.id === keepId);
+        if (kept) kept.count = target;
+      }
+      backToLobby(room); touch(room); break;
+    }
+    case 'setMode': {
+      if (!['solo', 'group'].includes(data.mode)) throw new Error('잘못된 모드입니다.');
+      room.mode = data.mode; touch(room); break;
+    }
+    case 'setTitle': {
+      room.title = String(data.title || '').trim().slice(0, 50); touch(room); break;
+    }
+    case 'setMap': {
+      if (!['wheel', 'greed', 'cascade', 'maze'].includes(data.map)) throw new Error('잘못된 맵입니다.');
+      room.map = data.map;
+      backToLobby(room);
+      room.shuffleNonce += 1;
+      room.seed = randomSeed();
+      touch(room); break;
+    }
+    case 'setWin': {
+      const mode = String(data.winMode || '').toLowerCase();
+      const ranks = asRanks(data.ranks);
+      if (!['first', 'last', 'number'].includes(mode)) throw new Error('잘못된 당첨 방식입니다.');
+      if (mode === 'number' && !ranks.length) throw new Error('유효한 순위를 입력해 주세요.');
+      room.winMode = mode;
+      room.winningRanks = mode === 'number' ? ranks : [1];
+      touch(room); break;
+    }
+    case 'shuffle': {
+      if (room.status === 'running') throw new Error('레이스 진행 중에는 섞을 수 없습니다.');
+      backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
+    }
+    case 'startRace': {
+      if (['wheel', 'greed', 'cascade', 'maze'].includes(data.map)) room.map = data.map;
+      const mode = String(data.winMode || '').toLowerCase();
+      const ranks = asRanks(data.ranks);
+      if (['first', 'last', 'number'].includes(mode) && (mode !== 'number' || ranks.length)) {
+        room.winMode = mode;
+        room.winningRanks = mode === 'number' ? ranks : [1];
+      }
+      const balls = [];
+      for (const p of room.participants) {
+        for (let i = 1; i <= Number(p.count || 0); i++) {
+          balls.push({ ballId: `${p.id}_${i}`, participantId: p.id, name: p.name, owner: p.owner, ownerInitial: p.ownerInitial || ownerInitial(p.owner), copy: i });
+        }
+      }
+      if (!balls.length) throw new Error('공을 1개 이상 추가해 주세요.');
+      room.raceBalls = balls;
+      room.finishOrder = [];
+      room.winners = [];
+      room.winnerDeclared = false;
+      room.snapshot = emptySnapshot();
+      room.snapshotSeq = 0;
+      room.raceId += 1;
+      if (!(room.seed > 0)) room.seed = randomSeed();
+      room.startedAt = now() + 250;
+      room.duration = 0;
+      room.status = 'running';
+      touch(room);
+      broadcastRoom(room);
+      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks });
+      return;
+    }
+    case 'snapshot': {
+      if (room.status === 'running') {
+        const seq = Math.max(0, Number(data.seq) || 0);
+        const raceId = Number(data.raceId) || room.raceId;
+        // 느리게 도착한 이전 프레임이 최신 화면을 되감는 현상을 차단한다.
+        if (raceId === room.raceId && seq >= Number(room.snapshotSeq || 0)) {
+          room.snapshotSeq = seq;
+          room.snapshot = {
+            balls: Array.isArray(data.balls) ? data.balls : [],
+            rot: Array.isArray(data.rot) ? data.rot : [],
+            gate: Number(data.gate || 0),
+            cam: Number(data.cam || 0),
+            camX: Number(data.camX || 560),
+            camZoom: Number(data.camZoom || 0.82),
+            seq, raceId
+          };
+          touch(room);
+          broadcastSnapshot(room);
+        }
+      }
+      break;
+    }
+    case 'interaction': {
+      const it = data.interaction && typeof data.interaction === 'object' ? data.interaction : {};
+      const seq = Math.max(Number(room.interactionSeq || 0) + 1, Number(it.seq || 0));
+      room.interactionSeq = seq;
+      broadcastInteraction(room, {
+        seq,
+        source: String(it.source || '').slice(0, 80),
+        type: String(it.type || '').slice(0, 30),
+        elementId: String(it.elementId || '').slice(0, 80),
+        label: String(it.label || '').slice(0, 80),
+        x: Math.max(0, Math.min(1, Number(it.x) || 0)),
+        y: Math.max(0, Math.min(1, Number(it.y) || 0)),
+        at: now()
+      });
+      return json(res, 200, { ok: true });
+    }
+    case 'finishBall': {
+      if (room.status === 'running') {
+        const id = String(data.ballId || '');
+        if (!room.finishOrder.some((x) => x.ballId === id)) {
+          const ball = room.raceBalls.find((x) => x.ballId === id);
+          if (ball) room.finishOrder.push({ ballId: ball.ballId, name: ball.name, copy: ball.copy, owner: ball.owner, ownerInitial: ball.ownerInitial || ownerInitial(ball.owner), rank: room.finishOrder.length + 1 });
+        }
+        if (!room.winnerDeclared) {
+          let ready = false;
+          if (room.winMode === 'first' && room.finishOrder.length >= 1) ready = true;
+          else if (room.winMode === 'number' && room.finishOrder.length >= Math.max(...room.winningRanks)) ready = true;
+          else if (room.winMode === 'last' && room.finishOrder.length >= room.raceBalls.length) ready = true;
+          if (ready) {
+            if (room.winMode === 'first') room.winners = [room.finishOrder[0]];
+            else if (room.winMode === 'last') room.winners = [room.finishOrder[room.finishOrder.length - 1]];
+            else room.winners = room.winningRanks.map((rank) => room.finishOrder[rank - 1]).filter(Boolean);
+            room.winnerDeclared = true;
+          }
+        }
+        touch(room);
+      }
+      break;
+    }
+    case 'completeRace': {
+      if (room.status === 'running') { room.status = 'completed'; touch(room); }
+      break;
+    }
+    case 'resetRace': {
+      backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
+    }
+    case 'clearParticipants': {
+      backToLobby(room); room.participants = []; room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
+    }
+    default: throw new Error('지원하지 않는 요청입니다.');
+  }
+
+  if (action !== 'snapshot' && action !== 'interaction') broadcastRoom(room);
+
+  // 고빈도 요청은 거대한 room 전체를 다시 JSON 직렬화하지 않는다.
+  // 이것이 관리자 물리 루프까지 막아 공이 멈춰 보이던 주원인이었다.
+  if (action === 'snapshot' || action === 'finishBall' || action === 'completeRace') {
+    return json(res, 200, { ok: true, updatedAt: room.updatedAt, status: room.status, winnerDeclared: room.winnerDeclared });
+  }
+  responseState(res, room);
+}
+
+
+function writeRoomPacket(room, packet) {
+  const key = cleanRoom(room.code);
+  const clients = roomStreams.get(key);
+  if (!clients || !clients.size) return;
+  const payload = `data: ${JSON.stringify(packet)}\n\n`;
+  for (const res of [...clients]) {
+    try { res.write(payload); } catch { clients.delete(res); }
+  }
+  if (!clients.size) roomStreams.delete(key);
+}
+
+function broadcastSnapshot(room) {
+  writeRoomPacket(room, { ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot });
+}
+
+function broadcastInteraction(room, interaction) {
+  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction });
+}
+
+function broadcastRoom(room) {
+  const key = cleanRoom(room.code);
+  const clients = roomStreams.get(key);
+  if (!clients || !clients.size) return;
+  const payload = `data: ${JSON.stringify({ ok: true, state: eventState(room) })}\n\n`;
+  for (const res of [...clients]) {
+    try { res.write(payload); } catch { clients.delete(res); }
+  }
+  if (!clients.size) roomStreams.delete(key);
+}
+
+function openRoomStream(req, res, code) {
+  const key = cleanRoom(code);
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream; charset=utf-8',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no'
+  });
+  res.write(`retry: 1200\ndata: ${JSON.stringify({ ok: true, state: getRoom(key) })}\n\n`);
+  if (!roomStreams.has(key)) roomStreams.set(key, new Set());
+  roomStreams.get(key).add(res);
+  const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 20000);
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    const clients = roomStreams.get(key);
+    if (clients) { clients.delete(res); if (!clients.size) roomStreams.delete(key); }
+  });
+}
+
+function serveStatic(req, res, pathname) {
+  let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  try { rel = decodeURIComponent(rel); } catch { return text(res, 400, 'Bad request'); }
+  const full = path.resolve(ROOT, rel);
+  if (!full.startsWith(ROOT + path.sep) && full !== ROOT) return text(res, 403, 'Forbidden');
+  fs.stat(full, (err, stat) => {
+    if (err || !stat.isFile()) return text(res, 404, 'Not found');
+    const type = mime[path.extname(full).toLowerCase()] || 'application/octet-stream';
+    res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store, no-cache, must-revalidate' });
+    fs.createReadStream(full).pipe(res);
+  });
+}
+
+const server = http.createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (url.pathname === '/health') return json(res, 200, { ok: true });
+    if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: clientState(getRoom(url.searchParams.get('room'))) });
+    if (url.pathname === '/api/events' && req.method === 'GET') return openRoomStream(req, res, url.searchParams.get('room'));
+    if (url.pathname === '/api/action' && req.method === 'POST') {
+      try { return handleAction(res, await readJson(req)); }
+      catch (error) { return json(res, 400, { ok: false, error: error.message || '오류가 발생했습니다.' }); }
+    }
+    return serveStatic(req, res, url.pathname);
+  } catch (error) {
+    console.error(error);
+    return json(res, 500, { ok: false, error: '서버 오류가 발생했습니다.' });
+  }
+});
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`YAMYAM Pinball listening on http://0.0.0.0:${PORT}`);
+});
