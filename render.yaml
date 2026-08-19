@@ -1,7 +1,9 @@
 services:
   - type: web
-    name: yamyampinball
+    name: yamyam-pinball
     runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
+    autoDeploy: true

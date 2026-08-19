@@ -777,5 +777,3 @@ aside{width:245px!important}
 }
 #winnerCard .winnerFlash{z-index:0!important}
 #winnerCard small,#winnerCard strong{z-index:31!important}
-
-#pauseBtn:disabled{opacity:.45;cursor:not-allowed}
