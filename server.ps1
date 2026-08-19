@@ -5,7 +5,7 @@ $Rooms = @{}
 $Mime = @{'.html'='text/html; charset=utf-8';'.js'='application/javascript; charset=utf-8';'.css'='text/css; charset=utf-8';'.json'='application/json; charset=utf-8';'.png'='image/png';'.jpg'='image/jpeg';'.svg'='image/svg+xml';'.ico'='image/x-icon'}
 function NowMs { return [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() }
 function NewRoom([string]$Code) {
-  return [ordered]@{ code=$Code; mode='group'; title='Yamyam Marble Pinball'; map='wheel'; status='lobby'; participants=@(); winMode='first'; winningRanks=@(1); finishOrder=@(); winners=@(); snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82}; raceId=0; seed=1; shuffleNonce=0; winnerDeclared=$false; startedAt=0; duration=0; paused=$false; pausedAt=0; updatedAt=(NowMs) }
+  return [ordered]@{ code=$Code; mode='group'; title='Yamyam Marble Pinball'; map='wheel'; status='lobby'; participants=@(); winMode='first'; winningRanks=@(1); finishOrder=@(); winners=@(); snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82}; raceId=0; seed=1; shuffleNonce=0; winnerDeclared=$false; startedAt=0; duration=0; updatedAt=(NowMs) }
 }
 function GetRoom([string]$Code) {
   if ([string]::IsNullOrWhiteSpace($Code)) { $Code='YAMYAM' }
@@ -15,16 +15,7 @@ function GetRoom([string]$Code) {
   return $Rooms[$Code]
 }
 function Touch($Room) { $Room.updatedAt=NowMs }
-function GetMeta($R) {
-  return [ordered]@{
-    code=$R.code; mode=$R.mode; title=$R.title; map=$R.map; status=$R.status;
-    participants=@($R.participants); winMode=$R.winMode; winningRanks=@($R.winningRanks);
-    finishOrder=@($R.finishOrder); winners=@($R.winners); raceId=$R.raceId; seed=$R.seed;
-    shuffleNonce=$R.shuffleNonce; winnerDeclared=$R.winnerDeclared; startedAt=$R.startedAt;
-    duration=$R.duration; paused=[bool]$R.paused; pausedAt=$R.pausedAt; updatedAt=$R.updatedAt
-  }
-}
-function BackToLobby($Room) { $Room.status='lobby';$Room.finishOrder=@();$Room.winners=@();$Room.winnerDeclared=$false;$Room.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$Room.startedAt=0;$Room.duration=0;$Room.paused=$false;$Room.pausedAt=0 }
+function BackToLobby($Room) { $Room.status='lobby';$Room.finishOrder=@();$Room.winners=@();$Room.winnerDeclared=$false;$Room.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$Room.startedAt=0;$Room.duration=0 }
 function SendBytes($Ctx,[int]$Status,[byte[]]$Bytes,[string]$Type) {
   $Ctx.Response.StatusCode=$Status; $Ctx.Response.ContentType=$Type; $Ctx.Response.ContentLength64=$Bytes.Length
   $Ctx.Response.Headers['Cache-Control']='no-store, no-cache, must-revalidate'
@@ -57,7 +48,7 @@ function HandleAction($Ctx,$D) {
       if($Matches.Count -eq 0){throw 'Participant not found.'}
       $Current=0;foreach($P in $Matches){$Current += [long]$P.count}
       if($null -ne $D.count){$Target=[long]$D.count}else{$Target=$Current+[long]$D.delta}
-      if($Target -lt 0){$Target=0};if($Target -gt 100000){$Target=100000}
+      if($Target -lt 0){$Target=0};if($Target -gt 5000){$Target=5000}
       $KeepId=[string]$Matches[0].id
       if($Target -eq 0){$R.participants=@($R.participants|Where-Object{-not(($Ids -contains [string]$_.id) -and ($Admin -or $_.owner -eq $Owner))})}
       else{
@@ -68,7 +59,7 @@ function HandleAction($Ctx,$D) {
     }
     'setMode' { $M=[string]$D.mode;if($M -ne 'solo' -and $M -ne 'group'){throw 'Invalid mode.'};$R.mode=$M;Touch $R }
     'setTitle' { $T=([string]$D.title).Trim();if($T.Length -gt 50){$T=$T.Substring(0,50)};$R.title=$T;Touch $R }
-    'setMap' { $M=[string]$D.map;if(@('wheel','cascade','maze') -notcontains $M){throw 'Invalid map.'};$R.map=$M;$R.status='lobby';$R.raceBalls=@();$R.finishOrder=@();$R.winners=@();$R.winnerDeclared=$false;$R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$R.startedAt=0;$R.duration=0;$R.paused=$false;$R.pausedAt=0;$R.shuffleNonce=[int]$R.shuffleNonce+1;$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000;Touch $R }
+    'setMap' { $M=[string]$D.map;if(@('wheel','cascade','maze') -notcontains $M){throw 'Invalid map.'};$R.map=$M;$R.status='lobby';$R.raceBalls=@();$R.finishOrder=@();$R.winners=@();$R.winnerDeclared=$false;$R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$R.startedAt=0;$R.duration=0;$R.shuffleNonce=[int]$R.shuffleNonce+1;$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000;Touch $R }
     'setWin' { $Mode=([string]$D.winMode).ToLowerInvariant();if(@('first','last','number') -notcontains $Mode){throw 'Invalid winner mode.'};$v=@();foreach($x in @($D.ranks)){$n=0;if([int]::TryParse([string]$x,[ref]$n) -and $n -gt 0){$v+=$n}};if($Mode -eq 'number' -and $v.Count -eq 0){throw 'Please enter a valid rank.'};$R.winMode=$Mode;$R.winningRanks=if($Mode -eq 'number'){@($v|Sort-Object -Unique)}else{@(1)};Touch $R;$MinimalResponse=$true }
     'shuffle' { if($R.status -eq 'running'){throw 'Race is running.'}; BackToLobby $R; $R.shuffleNonce=[int]$R.shuffleNonce+1; $R.seed=Get-Random -Minimum 100000 -Maximum 2147483000; Touch $R }
     'startRace' {
@@ -84,10 +75,10 @@ function HandleAction($Ctx,$D) {
       $balls=@();foreach($p in $R.participants){for($i=1;$i -le [long]$p.count;$i++){$balls += [ordered]@{ballId=($p.id+'_'+$i);participantId=$p.id;name=$p.name;owner=$p.owner;copy=$i}}}
       if($balls.Count -lt 1){throw 'At least 1 ball is required.'}
       $R.raceBalls=@($balls);$R.finishOrder=@();$R.winners=@();$R.winnerDeclared=$false;$R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82}
-      $R.raceId=[int]$R.raceId+1;if([int]$R.seed -le 0){$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000};$R.startedAt=(NowMs)+900;$R.duration=0;$R.paused=$false;$R.pausedAt=0;$R.status='running';Touch $R
-      SendJson $Ctx 200 ([ordered]@{ok=$true;raceId=$R.raceId;seed=$R.seed;status=$R.status;map=$R.map;winMode=$R.winMode;winningRanks=@($R.winningRanks);startedAt=$R.startedAt;paused=$false});return
+      $R.raceId=[int]$R.raceId+1;if([int]$R.seed -le 0){$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000};$R.startedAt=(NowMs)+250;$R.duration=0;$R.status='running';Touch $R
+      SendJson $Ctx 200 ([ordered]@{ok=$true;raceId=$R.raceId;seed=$R.seed;status=$R.status;map=$R.map;winMode=$R.winMode;winningRanks=@($R.winningRanks)});return
     }
-    'snapshot' { if($R.status -eq 'running' -and -not [bool]$R.paused){$R.snapshot=[ordered]@{balls=@($D.balls);rot=@($D.rot);gate=[double]$D.gate;cam=[double]$D.cam;camX=[double]$D.camX;camZoom=[double]$D.camZoom};Touch $R} }
+    'snapshot' { if($R.status -eq 'running'){$R.snapshot=[ordered]@{balls=@($D.balls);rot=@($D.rot);gate=[double]$D.gate;cam=[double]$D.cam;camX=[double]$D.camX;camZoom=[double]$D.camZoom};Touch $R} }
     'finishBall' {
       if($R.status -eq 'running'){
         $Id=[string]$D.ballId
@@ -111,35 +102,18 @@ function HandleAction($Ctx,$D) {
         Touch $R
       }
     }
-
-    'pauseRace' {
-      if($R.status -eq 'running' -and -not [bool]$R.paused){
-        $R.paused=$true;$R.pausedAt=NowMs;Touch $R
-      }
-      $MinimalResponse=$true
-    }
-    'resumeRace' {
-      if($R.status -eq 'running' -and [bool]$R.paused){
-        $Now=NowMs
-        if([long]$R.pausedAt -gt 0 -and [long]$R.startedAt -gt 0){
-          $R.startedAt=[long]$R.startedAt+($Now-[long]$R.pausedAt)
-        }
-        $R.paused=$false;$R.pausedAt=0;Touch $R
-      }
-      $MinimalResponse=$true
-    }
     'completeRace' { if($R.status -eq 'running'){$R.status='completed';Touch $R} }
     'resetRace' {
       # 방·연결·참가자는 유지하고 현재 경기 공/순위/스냅샷만 비운다.
       $R.status='lobby';$R.finishOrder=@();$R.winners=@();$R.winnerDeclared=$false;$R.raceBalls=@();
-      $R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$R.startedAt=0;$R.duration=0;$R.paused=$false;$R.pausedAt=0
+      $R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$R.startedAt=0;$R.duration=0
       $R.shuffleNonce=[int]$R.shuffleNonce+1;$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000
       Touch $R
     }
-    'clearParticipants' {$R.status='lobby';$R.participants=@();$R.raceBalls=@();$R.finishOrder=@();$R.winners=@();$R.winnerDeclared=$false;$R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$R.startedAt=0;$R.duration=0;$R.paused=$false;$R.pausedAt=0;$R.shuffleNonce=[int]$R.shuffleNonce+1;$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000;Touch $R}
+    'clearParticipants' {$R.status='lobby';$R.participants=@();$R.raceBalls=@();$R.finishOrder=@();$R.winners=@();$R.winnerDeclared=$false;$R.snapshot=[ordered]@{balls=@();rot=@();gate=0;cam=0;camX=560;camZoom=0.82};$R.startedAt=0;$R.duration=0;$R.shuffleNonce=[int]$R.shuffleNonce+1;$R.seed=Get-Random -Minimum 100000 -Maximum 2147483000;Touch $R}
     default {throw 'Unknown action.'}
   }
-  if($MinimalResponse){SendJson $Ctx 200 ([ordered]@{ok=$true;winMode=$R.winMode;winningRanks=@($R.winningRanks);updatedAt=$R.updatedAt;paused=[bool]$R.paused;startedAt=$R.startedAt})}else{SendJson $Ctx 200 ([ordered]@{ok=$true;state=$R})}
+  if($MinimalResponse){SendJson $Ctx 200 ([ordered]@{ok=$true;winMode=$R.winMode;winningRanks=@($R.winningRanks);updatedAt=$R.updatedAt})}else{SendJson $Ctx 200 ([ordered]@{ok=$true;state=$R})}
 }
 $L=New-Object Net.HttpListener
 $L.Prefixes.Add("http://localhost:$Port/");$L.Prefixes.Add("http://127.0.0.1:$Port/")
@@ -150,8 +124,6 @@ Start-Process "http://localhost:$Port/admin.html?room=YAMYAM"
 while($L.IsListening){
   try{$C=$L.GetContext();$Q=$C.Request;$P=[Uri]::UnescapeDataString($Q.Url.AbsolutePath)
     if($P -eq '/api/state' -and $Q.HttpMethod -eq 'GET'){SendJson $C 200 ([ordered]@{ok=$true;state=(GetRoom $Q.QueryString['room'])});continue}
-    if($P -eq '/api/meta' -and $Q.HttpMethod -eq 'GET'){$R=GetRoom $Q.QueryString['room'];SendJson $C 200 ([ordered]@{ok=$true;state=(GetMeta $R)});continue}
-    if($P -eq '/api/checkpoint' -and $Q.HttpMethod -eq 'GET'){$R=GetRoom $Q.QueryString['room'];SendJson $C 200 ([ordered]@{ok=$true;raceId=$R.raceId;status=$R.status;paused=[bool]$R.paused;snapshot=$R.snapshot;updatedAt=$R.updatedAt});continue}
     if($P -eq '/api/action' -and $Q.HttpMethod -eq 'POST'){try{HandleAction $C (ReadJson $Q)}catch{SendJson $C 400 ([ordered]@{ok=$false;error=$_.Exception.Message})};continue}
     if($P -eq '/'){$P='/admin.html'};$Rel=$P.TrimStart('/') -replace '/', [IO.Path]::DirectorySeparatorChar;$Full=[IO.Path]::GetFullPath((Join-Path $Root $Rel));$Base=[IO.Path]::GetFullPath($Root)
     if(-not $Full.StartsWith($Base,[StringComparison]::OrdinalIgnoreCase)){SendText $C 403 'Forbidden' 'text/plain';continue}
