@@ -68,7 +68,8 @@ function newRoom(code) {
     duration: 0,
     updatedAt: now(),
     snapshotSeq: 0,
-    interactionSeq: 0
+    interactionSeq: 0,
+    raceHostId: ''
   };
 }
 
@@ -88,6 +89,7 @@ function backToLobby(room) {
   room.snapshot = emptySnapshot();
   room.startedAt = 0;
   room.duration = 0;
+  room.raceHostId = '';
 }
 
 function randomSeed() {
@@ -133,7 +135,7 @@ function asRanks(values) {
 }
 
 function responseState(res, room, extra = {}) {
-  json(res, 200, { ok: true, state: clientState(room), ...extra });
+  json(res, 200, { ok: true, state: clientState(room), serverNow: now(), ...extra });
 }
 
 function clientState(room) {
@@ -242,16 +244,17 @@ function handleAction(res, data) {
       room.snapshotSeq = 0;
       room.raceId += 1;
       if (!(room.seed > 0)) room.seed = randomSeed();
-      room.startedAt = now() + 250;
+      room.startedAt = now() + 1400;
       room.duration = 0;
+      room.raceHostId = String(data.clientId || '');
       room.status = 'running';
       touch(room);
       broadcastRoom(room);
-      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks });
+      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks, startedAt: room.startedAt, raceHostId: room.raceHostId, serverNow: now() });
       return;
     }
     case 'snapshot': {
-      if (room.status === 'running') {
+      if (room.status === 'running' && String(data.clientId || '') === String(room.raceHostId || '')) {
         const seq = Math.max(0, Number(data.seq) || 0);
         const raceId = Number(data.raceId) || room.raceId;
         // 느리게 도착한 이전 프레임이 최신 화면을 되감는 현상을 차단한다.
@@ -291,7 +294,7 @@ function handleAction(res, data) {
       return json(res, 200, { ok: true });
     }
     case 'finishBall': {
-      if (room.status === 'running') {
+      if (room.status === 'running' && String(data.clientId || '') === String(room.raceHostId || '')) {
         const id = String(data.ballId || '');
         if (!room.finishOrder.some((x) => x.ballId === id)) {
           const ball = room.raceBalls.find((x) => x.ballId === id);
@@ -314,7 +317,7 @@ function handleAction(res, data) {
       break;
     }
     case 'completeRace': {
-      if (room.status === 'running') { room.status = 'completed'; touch(room); }
+      if (room.status === 'running' && String(data.clientId || '') === String(room.raceHostId || '')) { room.status = 'completed'; touch(room); }
       break;
     }
     case 'resetRace': {
@@ -352,7 +355,7 @@ function broadcastSnapshot(room) {
   const key = cleanRoom(room.code);
   const clients = roomStreams.get(key);
   if (!clients || !clients.size) return;
-  const payload = `data: ${JSON.stringify({ ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot })}\n\n`;
+  const payload = `data: ${JSON.stringify({ ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot, serverNow: now() })}\n\n`;
   for (const res of [...clients]) {
     try {
       // 느린 관전자에게 이전 프레임을 계속 쌓지 않고 최신 프레임 하나만 보관한다.
@@ -374,14 +377,14 @@ function broadcastSnapshot(room) {
 }
 
 function broadcastInteraction(room, interaction) {
-  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction });
+  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction, serverNow: now() });
 }
 
 function broadcastRoom(room) {
   const key = cleanRoom(room.code);
   const clients = roomStreams.get(key);
   if (!clients || !clients.size) return;
-  const payload = `data: ${JSON.stringify({ ok: true, state: eventState(room) })}\n\n`;
+  const payload = `data: ${JSON.stringify({ ok: true, state: eventState(room), serverNow: now() })}\n\n`;
   for (const res of [...clients]) {
     try { res.write(payload); } catch { clients.delete(res); }
   }
