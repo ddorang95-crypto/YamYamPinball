@@ -1048,3 +1048,47 @@ body.unified .participantList .participantName{
 body.unified .participantList .personBallCount strong{
   color:color-mix(in srgb,var(--personColor) 72%,#ffe66f 28%)!important;
 }
+
+/* v17.11.4 현재 참가자 카드: 공/숫자 겹침 방지 + 입력자 이니셜 */
+.admin .participantList .ownerInitialBadge,
+body.unified .participantList .ownerInitialBadge{
+  display:inline-flex!important;
+  flex:0 0 28px!important;
+  width:28px!important;height:28px!important;
+  align-items:center!important;justify-content:center!important;
+  border-radius:8px!important;
+  background:#34255f!important;
+  border:1px solid #7057bd!important;
+  color:#f4edff!important;
+  font-size:12px!important;font-weight:1000!important;
+  line-height:1!important;
+  margin:0 2px!important;
+}
+.admin .participantList .pitem,
+body.unified .participantList .pitem{
+  display:flex!important;align-items:center!important;
+  column-gap:8px!important;
+  min-width:0!important;
+}
+.admin .participantList .colorDot,
+body.unified .participantList .colorDot{
+  flex:0 0 10px!important;width:10px!important;height:10px!important;
+  margin:0 2px!important;
+}
+.admin .participantList .participantName,
+body.unified .participantList .participantName{
+  flex:1 1 110px!important;min-width:70px!important;
+  padding-left:0!important;margin-right:6px!important;
+}
+.admin .participantList .ballAdjust,
+body.unified .participantList .ballAdjust{
+  flex:0 0 auto!important;margin-left:auto!important;gap:6px!important;
+}
+.admin .participantList .personBallCount,
+body.unified .participantList .personBallCount{
+  min-width:48px!important;padding:0 5px!important;
+  display:inline-flex!important;align-items:baseline!important;justify-content:center!important;
+  gap:3px!important;
+}
+.admin .participantList .personBallCount strong,
+body.unified .participantList .personBallCount strong{position:static!important;margin:0!important}
