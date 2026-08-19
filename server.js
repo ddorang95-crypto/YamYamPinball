@@ -440,19 +440,20 @@ function wsFrame(text) {
   return Buffer.concat([head, payload]);
 }
 function wsBroadcastSnapshot(room, packet, source) {
-  const key = cleanRoom(room.code);
-  const clients = roomSockets.get(key);
-  if (!clients || !clients.size) return;
-  const frame = wsFrame(JSON.stringify(packet));
-  for (const sock of [...clients]) {
-    if (sock.destroyed || !sock.writable) continue;
-    try {
-      // 느린 관전자는 이전 프레임을 쌓지 않고 최신 프레임만 받는다.
-      if (sock.writableLength > 260000) continue;
+  const key=cleanRoom(room.code),clients=roomSockets.get(key);
+  if(!clients||!clients.size)return;
+  const frame=wsFrame(JSON.stringify(packet));
+  for(const sock of [...clients]){
+    if(sock.destroyed||!sock.writable)continue;
+    try{
+      if(sock.writableLength>180000){sock.__latestSnapshotFrame=frame;continue}
       sock.write(frame);
-    } catch { clients.delete(sock); try { sock.destroy(); } catch {} }
+      if(sock.__latestSnapshotFrame&&sock.writableLength<90000){
+        const latest=sock.__latestSnapshotFrame;sock.__latestSnapshotFrame=null;sock.write(latest);
+      }
+    }catch{clients.delete(sock);try{sock.destroy()}catch{}}
   }
-  if (!clients.size) roomSockets.delete(key);
+  if(!clients.size)roomSockets.delete(key);
 }
 function parseWsFrames(socket, chunk) {
   socket.__wsBuffer = Buffer.concat([socket.__wsBuffer || Buffer.alloc(0), chunk]);
@@ -501,7 +502,7 @@ function openSnapshotSocket(req, socket, head, url) {
   socket.on('error', () => { try { socket.destroy(); } catch {} });
   if (head && head.length) parseWsFrames(socket, head);
   const room = getRoom(roomCode);
-  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot }))); } catch {}
+  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot ? {...room.snapshot,sentAt:now()} : room.snapshot }))); } catch {}
 }
 
 function serveStatic(req, res, pathname) {

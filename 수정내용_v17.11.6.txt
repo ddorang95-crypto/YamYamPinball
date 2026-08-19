@@ -1,0 +1,26 @@
+v17.11.6
+
+이번 수정은 단체핀볼뿐 아니라 YAMYAM / GGULHYE / SEONHA / DORIT 등 모든 room에 동일하게 적용됩니다.
+
+수정:
+1. 시작자와 관전자 화면 크기/공 크기 차이
+- snapshot에 송신자 핀볼 캔버스 크기(viewW/viewH)를 같이 기록.
+- 관전자 창 크기가 달라도 송신자의 world framing과 같은 범위가 보이도록 camZoom을 환산.
+- '다른 사람 화면에서 전체가 축소되고 공이 작아지는' 현상 수정.
+
+2. 관전자 렉
+- 공 프레임 packed v2 추가.
+- 매 프레임 닉네임/owner 문자열을 반복 전송하지 않고 ballId + 위치/속도/상태만 전송.
+- 메타데이터는 raceBalls에서 복원.
+- 네트워크 snapshot 용량을 크게 줄임.
+- 500공 이하 약 30fps, 500~800공 약 20fps, 800~1500공 약 15fps, 그 이상 약 11fps 전송 후 브라우저에서 60fps 보간.
+- WebSocket이 잠깐 밀리면 오래된 프레임을 쌓지 않고 최신 프레임 하나만 보관.
+
+3. 공통 시각
+- 모든 화면은 동일 서버 timestamp 기준 snapshot 스트림을 사용.
+- 공통 재생 버퍼를 420ms → 260ms로 낮춤.
+- host도 동일 공식 스트림을 보므로 시작자만 앞서 보지 않음.
+- 기존 official ballFinish / winnerResolved 예약시각 동기화 유지.
+
+4. 모든 방
+- GROUP, YAMYAM, GGULHYE, SEONHA, DORIT 구분 없이 동일 snapshot/서버타임라인/팝업 동기화 코드를 사용.
