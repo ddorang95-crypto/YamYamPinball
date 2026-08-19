@@ -399,7 +399,7 @@ function openRoomStream(req, res, code) {
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no'
   });
-  res.write(`retry: 1200\ndata: ${JSON.stringify({ ok: true, state: getRoom(key) })}\n\n`);
+  res.write(`retry: 1200\ndata: ${JSON.stringify({ ok: true, state: getRoom(key), serverNow: now() })}\n\n`);
   if (!roomStreams.has(key)) roomStreams.set(key, new Set());
   roomStreams.get(key).add(res);
   const keepAlive = setInterval(() => { try { res.write(': ping\n\n'); } catch {} }, 20000);

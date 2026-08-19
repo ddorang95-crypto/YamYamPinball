@@ -151,6 +151,30 @@ let syncClockOffset=0,syncStartTimer=0,syncStartRaceId=0;
 function syncNoteClock(serverNow){const n=Number(serverNow);if(!Number.isFinite(n))return;const sample=n-Date.now();syncClockOffset=syncClockOffset?syncClockOffset*.82+sample*.18:sample}
 function syncNow(){return Date.now()+syncClockOffset}
 function cancelSyncStart(){if(syncStartTimer){clearTimeout(syncStartTimer);syncStartTimer=0}syncStartRaceId=0}
+function applyCurrentSnapshotOnce(snap,attempt=0){
+ if(!sim||!snap||!Array.isArray(snap.balls)||!snap.balls.length)return;
+ if(sim.box2dLoading&&attempt<120){setTimeout(()=>applyCurrentSnapshotOnce(snap,attempt+1),25);return}
+ const byId=new Map(snap.balls.map(q=>[String(q.ballId),q]));
+ for(const b of sim.balls||[]){
+  const q=byId.get(String(b.ballId));if(!q)continue;
+  b.x=Number(q.x)||b.x;b.y=Number(q.y)||b.y;b.prevX=b.x;b.prevY=b.y;
+  b.vx=Number(q.vx)||0;b.vy=Number(q.vy)||0;b.done=!!q.done;b.qualified=!!q.qualified;b.rank=Number(q.rank)||0;b.waiting=!!q.waiting;
+  if(sim.box2d?.bodies){
+   const body=sim.box2d.bodies.get(String(b.ballId));
+   if(body)try{
+    const P=sim.box2d;
+    body.SetTransform(new P.B.b2Vec2((b.x-P.X0)/P.S,(b.y-P.Y0)/P.S),body.GetAngle());
+    body.SetLinearVelocity(new P.B.b2Vec2(b.vx/P.S,b.vy/P.S));
+    body.SetEnabled(!b.done);body.SetAwake(!b.done&&!b.waiting);
+   }catch(_){}
+  }
+ }
+ if(Array.isArray(snap.rot)&&sim.map?.rot)snap.rot.forEach((v,i)=>{if(sim.map.rot[i])sim.map.rot[i].a=Number(v)||0});
+ if(Number.isFinite(Number(snap.cam)))sim.cam=Number(snap.cam);
+ if(Number.isFinite(Number(snap.camX)))sim.camX=Number(snap.camX);
+ if(Number.isFinite(Number(snap.camZoom)))sim.camZoom=Number(snap.camZoom);
+ sim.sharedTick=Math.max(0,Math.floor((syncNow()-Number(state?.startedAt||syncNow()))/8.333));
+}
 function scheduleSharedRace(incoming){
  if(!incoming||incoming.status!=='running')return;
  const rid=Number(incoming.raceId)||0;
@@ -160,11 +184,14 @@ function scheduleSharedRace(incoming){
  const begin=()=>{
   syncStartTimer=0;
   if(!state||state.status!=='running'||Number(state.raceId)!==rid)return;
+  const lateBy=Math.max(0,syncNow()-Number(state.startedAt||syncNow()));
+  const recoverySnap=lateBy>1800&&state.snapshot?.balls?.length?state.snapshot:null;
   stopLocalRace({clearParticipants:false});
   localRunning=true;
   localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
   lastRace=rid;raceHostId=String(state.raceHostId||'');snapshotSeq=0;lastAcceptedSnapshotSeq=0;
   startPhysics();
+  if(recoverySnap)setTimeout(()=>applyCurrentSnapshotOnce(recoverySnap),80);
  };
  const delay=Number(incoming.startedAt||0)-syncNow();
  if(delay>15)syncStartTimer=setTimeout(begin,delay);else begin();
@@ -197,20 +224,27 @@ function connectRoomEvents(){
     return;
    }
    const incoming=packet.state;if(!incoming)return;
-   // 통합 사이트에서는 다른 멤버가 바꾼 맵/참가자/설정을 로컬 저장값으로 덮어쓰지 않는다.
-   if(localRunning&&sim&&localRaceConfig){
-    incoming.status='running';incoming.map=localRaceConfig.map;incoming.raceId=localRaceConfig.raceId;incoming.seed=localRaceConfig.seed;incoming.winMode=localRaceConfig.winMode;incoming.winningRanks=localRaceConfig.ranks;
-   }
    // 제어 이벤트는 snapshot을 의도적으로 제외하므로 현재 좌표 프레임을 유지해 화면 점프를 막는다.
    if(state?.snapshot&&!incoming.snapshot)incoming.snapshot=state.snapshot;
    if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
    if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
    if(state?.raceBalls&&!incoming.raceBalls)incoming.raceBalls=state.raceBalls;
-   const previousRace=state?.raceId;state=incoming;ui();
+   const previousRace=state?.raceId,previousStatus=state?.status;
+   // 서버 상태가 방의 정답이다. 다른 사람이 초기화/맵변경/당첨기준 변경하면 현재 화면도 즉시 같은 상태로 맞춘다.
+   if(localRunning&&incoming.status!=='running'){
+    cancelSyncStart();
+    stopLocalRace({clearParticipants:false});
+   }
+   state=incoming;
+   if(localRunning&&localRaceConfig&&state.status==='running'&&Number(state.raceId)===Number(lastRace)){
+    localRaceConfig.winMode=state.winMode;
+    localRaceConfig.ranks=state.winningRanks||[1];
+   }
+   ui();
    if(!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&Number(state.raceId)!==Number(lastRace)){
     scheduleSharedRace(state);
    }
-   if(previousRace!==state.raceId)lastRankCount=-1;
+   if(previousRace!==state.raceId||previousStatus!==state.status)lastRankCount=-1;
   }catch(e){console.warn('실시간 상태 처리 실패',e)}
  };
  eventSource.onerror=()=>{if($('conn'))$('conn').textContent='실시간 재연결 중'};
@@ -218,8 +252,8 @@ function connectRoomEvents(){
 async function poll(){
  // 관리자 로컬 물리가 권위 소스인 동안에는 자기 스냅샷을 다시 내려받아 파싱하지 않는다.
  // 네트워크/JSON 작업이 메인 스레드를 막아 공이 중간에 멈추는 현상을 방지한다.
- if(localRunning&&sim){setTimeout(poll,350);return}
- if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;syncNoteClock(j.serverNow);if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(localRunning&&sim&&localRaceConfig){incoming.status='running';incoming.map=localRaceConfig.map;incoming.raceId=localRaceConfig.raceId;incoming.seed=localRaceConfig.seed;incoming.winMode=localRaceConfig.winMode;incoming.winningRanks=localRaceConfig.ranks}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(role==='admin'&&!unifiedMode&&!localRunning)applyAdminPrefs(incoming,selectedMapLock||incoming.map);if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&Number(state.raceId)!==Number(lastRace)){scheduleSharedRace(state)}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
+ if(localRunning&&sim&&eventSource&&eventSource.readyState===1){setTimeout(poll,900);return}
+ if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;syncNoteClock(j.serverNow);if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(role==='admin'&&!unifiedMode&&!localRunning)applyAdminPrefs(incoming,selectedMapLock||incoming.map);if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&Number(state.raceId)!==Number(lastRace)){scheduleSharedRace(state)}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
 function parseBulk(t){return t.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.*?)(?:\s*[xX*×]\s*(\d+))?$/);return{name:(m?.[1]||'').trim(),count:Math.max(1,Number(m?.[2]||1)|0)}}).filter(x=>x.name)}
 function bindAdmin(){
  if($('soloBtn'))$('soloBtn').onclick=()=>api('setMode',{mode:'solo'});if($('groupBtn'))$('groupBtn').onclick=()=>api('setMode',{mode:'group'});if($('saveTitle')&&$('titleInput'))$('saveTitle').onclick=()=>api('setTitle',{title:$('titleInput').value});
@@ -638,14 +672,14 @@ function startLegacyPhysics(){const physicsEpoch=++lifecycleEpoch;lastRace=state
  // 공 수에 따라 초반 흐름은 유지하되, 60초 이후부터 정체 공에만 단계적으로 배출 보조를 준다.
  // v13.27: 대량 공은 전체 투입 시간이 지나치게 길어지지 않도록 간격을 자동 조절한다.
  const releaseGap=0;
- const arr=raw.map((b,i)=>{const row=Math.floor(i/cols),slot=i%cols,zig=row%2?.5:0,base=cols===1?W/2:125+(slot+zig)*((W-250)/Math.max(1,cols-1));const seed=((state.seed||1)^hash(b.ballId)^((i+1)*2654435761))>>>0;const lane=(slot/(Math.max(1,cols-1))-.5);const releaseJitter=Math.floor(rr()*9);const startY=22-(row%3)*3;return{...b,x:clamp(base+(rr()-.5)*28,116,W-116),y:startY,prevX:0,prevY:startY,vx:lane*.22+(rr()-.5)*.48,vy:.018+rr()*.045,r:R,releaseAt:now,done:false,qualified:false,rank:0,lastMoveAt:now,lastMoveX:0,lastMoveY:startY,stuckCount:0,lastRescueAt:0,ghostUntil:0,stunStart:0,stunUntil:0,stunTriggered:false,stunAnchorY:0,stunCooldownUntil:0,lastWallBounceAt:0,lastGateKickAt:0,lastGateTouchAt:0,gateSide:0,gateContactUntil:0,gateLiftUntil:0,lastFlowBounceAt:0,lastLowerBounceAt:0,lastFinalSeparateAt:0,finalLaneSide:0,finishDropSpeed:0,approachLane:((i+hash(b.ballId))%3),approachSpeed:(.84+rr()*.34),approachPhase:rr()*Math.PI*2,rngState:seed||1}});for(const b of arr){b.prevX=b.x;b.prevY=b.y;b.lastMoveX=b.x;b.lastMoveY=b.y}manualCam=null;sim={balls:arr,map:mapDef(state.map,state.seed),effects:globalEffects(),finish:[],last:now,startedAt:now,targetMs,hardDeadline:118000,acc:0,lastSend:0,paused:false,cam:0,camX:W/2,camZoom:.96,slowRank:0,slowUntil:0,slowedRanks:new Set(),finishFocusUntil:0,finishFlash:null,entrySlowRank:0,entrySlowUntil:0,entrySlowed:new Set(),finishZoomUntil:0,finishZoomStart:0,focusBallId:null,preWinnerFocusRank:0,preWinnerFocusStartedAt:0,preSlowTarget:0,slowScale:1,slowTarget:1,completionSent:false,winnerResolved:false,winnerResolvedAt:0,cameraTargetY:0,cameraTargetX:W/2,cameraTargetZoom:1,cameraHoldUntil:0,cameraLastPick:0,cameraReason:'출발',cameraVelocityY:0,cameraVelocityX:0,bottomCameraLocked:false,bottomCameraLockedAt:0,stunGateCooldownUntil:0,jamWatchAt:now,jamZones:new Map(),lastStepAt:now,chuteActiveBallId:null,chuteNextReleaseAt:now+240};}
+ const arr=raw.map((b,i)=>{const row=Math.floor(i/cols),slot=i%cols,zig=row%2?.5:0,base=cols===1?W/2:125+(slot+zig)*((W-250)/Math.max(1,cols-1));const seed=((state.seed||1)^hash(b.ballId)^((i+1)*2654435761))>>>0;const lane=(slot/(Math.max(1,cols-1))-.5);const releaseJitter=Math.floor(rr()*9);const startY=22-(row%3)*3;return{...b,x:clamp(base+(rr()-.5)*28,116,W-116),y:startY,prevX:0,prevY:startY,vx:lane*.22+(rr()-.5)*.48,vy:.018+rr()*.045,r:R,releaseAt:now,done:false,qualified:false,rank:0,lastMoveAt:now,lastMoveX:0,lastMoveY:startY,stuckCount:0,lastRescueAt:0,ghostUntil:0,stunStart:0,stunUntil:0,stunTriggered:false,stunAnchorY:0,stunCooldownUntil:0,lastWallBounceAt:0,lastGateKickAt:0,lastGateTouchAt:0,gateSide:0,gateContactUntil:0,gateLiftUntil:0,lastFlowBounceAt:0,lastLowerBounceAt:0,lastFinalSeparateAt:0,finalLaneSide:0,finishDropSpeed:0,approachLane:((i+hash(b.ballId))%3),approachSpeed:(.84+rr()*.34),approachPhase:rr()*Math.PI*2,rngState:seed||1}});for(const b of arr){b.prevX=b.x;b.prevY=b.y;b.lastMoveX=b.x;b.lastMoveY=b.y}manualCam=null;sim={sharedRngState:((Number(state.seed)||1)^0x9e3779b9)>>>0,sharedTick:0,balls:arr,map:mapDef(state.map,state.seed),effects:globalEffects(),finish:[],last:now,startedAt:now,targetMs,hardDeadline:118000,acc:0,lastSend:0,paused:false,cam:0,camX:W/2,camZoom:.96,slowRank:0,slowUntil:0,slowedRanks:new Set(),finishFocusUntil:0,finishFlash:null,entrySlowRank:0,entrySlowUntil:0,entrySlowed:new Set(),finishZoomUntil:0,finishZoomStart:0,focusBallId:null,preWinnerFocusRank:0,preWinnerFocusStartedAt:0,preSlowTarget:0,slowScale:1,slowTarget:1,completionSent:false,winnerResolved:false,winnerResolvedAt:0,cameraTargetY:0,cameraTargetX:W/2,cameraTargetZoom:1,cameraHoldUntil:0,cameraLastPick:0,cameraReason:'출발',cameraVelocityY:0,cameraVelocityX:0,bottomCameraLocked:false,bottomCameraLockedAt:0,stunGateCooldownUntil:0,jamWatchAt:now,jamZones:new Map(),lastStepAt:now,chuteActiveBallId:null,chuteNextReleaseAt:now+240};}
 
 async function startOriginalBox2DRace(){
  const physicsEpoch=++lifecycleEpoch;lastRace=state.raceId;
  const rr=rnd((state.seed||1)+(state.shuffleNonce||0)*9973),raw=balls();
  for(let i=raw.length-1;i>0;i--){const j=Math.floor(rr()*(i+1));[raw[i],raw[j]]=[raw[j],raw[i]]}
  const stage=activeOriginalStage(),now=performance.now(),map=buildOriginalStageMap(stage,state.map);
- sim={balls:[],map,effects:globalEffects(),finish:[],last:now,startedAt:now,startReleaseAt:now+900,startEffectsAt:now+2400,targetMs:106000,hardDeadline:118000,acc:0,lastSend:0,paused:false,cam:0,camX:W/2,camZoom:.96,slowRank:0,slowUntil:0,slowedRanks:new Set(),finishFocusUntil:0,finishFlash:null,entrySlowRank:0,entrySlowUntil:0,entrySlowed:new Set(),finishZoomUntil:0,finishZoomStart:0,focusBallId:null,preWinnerFocusRank:0,preWinnerFocusStartedAt:0,preSlowTarget:0,slowScale:1,slowTarget:1,completionSent:false,winnerResolved:false,winnerResolvedAt:0,cameraTargetY:0,cameraTargetX:W/2,cameraTargetZoom:1,cameraHoldUntil:0,cameraLastPick:0,cameraReason:'출발',cameraVelocityY:0,cameraVelocityX:0,bottomCameraLocked:false,bottomCameraLockedAt:0,lastStepAt:now,box2dLoading:true,box2d:null,impactDisabledUntil:now+1500,winnerPopupReady:false,winnerPopupReadyAt:0,winnerPopupNotBefore:0};
+ sim={sharedRngState:((Number(state.seed)||1)^0x9e3779b9)>>>0,sharedTick:0,balls:[],map,effects:globalEffects(),finish:[],last:now,startedAt:now,startReleaseAt:now+900,startEffectsAt:now+2400,targetMs:106000,hardDeadline:118000,acc:0,lastSend:0,paused:false,cam:0,camX:W/2,camZoom:.96,slowRank:0,slowUntil:0,slowedRanks:new Set(),finishFocusUntil:0,finishFlash:null,entrySlowRank:0,entrySlowUntil:0,entrySlowed:new Set(),finishZoomUntil:0,finishZoomStart:0,focusBallId:null,preWinnerFocusRank:0,preWinnerFocusStartedAt:0,preSlowTarget:0,slowScale:1,slowTarget:1,completionSent:false,winnerResolved:false,winnerResolvedAt:0,cameraTargetY:0,cameraTargetX:W/2,cameraTargetZoom:1,cameraHoldUntil:0,cameraLastPick:0,cameraReason:'출발',cameraVelocityY:0,cameraVelocityX:0,bottomCameraLocked:false,bottomCameraLockedAt:0,lastStepAt:now,box2dLoading:true,box2d:null,impactDisabledUntil:now+1500,winnerPopupReady:false,winnerPopupReadyAt:0,winnerPopupNotBefore:0};
  manualCam=null;ui();flash('원본 Box2D 물리 준비 중…');
  const factory=await box2dFactoryPromise;
  if(physicsEpoch!==lifecycleEpoch||!sim||!localRunning)return;
@@ -743,7 +777,7 @@ function triggerOriginalImpactSkill(sourceBall,sourceBody,P,now){
 }
 function stepOriginalBox2D(dt){
  if(!sim?.box2d||sim.paused)return;
- const now=performance.now(),P=sim.box2d,{world,bodies,entities,S,X0,Y0,B}=P,stage=P.stage||activeOriginalStage();
+ const now=(sim.startedAt||0)+(Number(sim.sharedTick)||0)*8.333,P=sim.box2d,{world,bodies,entities,S,X0,Y0,B}=P,stage=P.stage||activeOriginalStage();
  // 시작 전에는 오와열을 유지하고, 시작 연출 시간이 되면 모든 공의 중력을 한 번에 활성화한다.
  if(!sim.startBodiesReleased&&now>=(sim.startReleaseAt||0)){
   sim.startBodiesReleased=true;
@@ -965,7 +999,13 @@ function stepOriginalBox2D(dt){
  const total=sim.balls.length;
  if(sim.finish.length>=total&&!sim.completionSent){sim.completionSent=true;setTimeout(()=>{if(String(state?.raceHostId||'')===String(clientId))String(state?.raceHostId||'')===String(clientId)&&apiQuiet('completeRace').catch(()=>{})},500)}
 }
-function rrGlobal(){return Math.random()}
+function rrGlobal(){
+ if(!sim)return .5;
+ let x=(Number(sim.sharedRngState)||((Number(state?.seed)||1)^0x9e3779b9))>>>0;
+ x^=x<<13;x^=x>>>17;x^=x<<5;
+ sim.sharedRngState=x>>>0;
+ return (sim.sharedRngState>>>0)/4294967296;
+}
 
 function collideSeg(b,g){
  const dx=g.x2-g.x1,dy=g.y2-g.y1,L=dx*dx+dy*dy;if(L<.0001)return false;
@@ -1000,7 +1040,7 @@ function collidePeg(b,q){
  return true;
 }
 function collideBalls(a,finalOnly=false){
- const grid=new Map(),cs=58,now=performance.now(),fz0=sim?.map?.finalZone;
+ const grid=new Map(),cs=58,now=(sim?.startedAt||0)+(Number(sim?.sharedTick)||0)*8.333,fz0=sim?.map?.finalZone;
  // 공간 해시에는 실제 검사 대상만 넣어 1000공에서도 전체쌍 비교가 발생하지 않게 한다.
  const candidates=finalOnly&&fz0?a.filter(b=>!b.done&&now>=(b.releaseAt||0)&&b.y>fz0.pocketTop-90):a;
  for(const b of candidates){if(b.done||now<(b.releaseAt||0))continue;const k=(b.x/cs|0)+','+(b.y/cs|0);(grid.get(k)||grid.set(k,[]).get(k)).push(b)}
@@ -1167,7 +1207,7 @@ function step(dt){
  if(!sim||sim.paused)return;
  if(sim.box2dLoading)return;
  if(sim.box2d){stepOriginalBox2D(dt);return;}
- const now=performance.now(),elapsed=now-sim.startedAt;sim.lastStepAt=now;
+ const now=(sim.startedAt||0)+(Number(sim.sharedTick)||0)*8.333,elapsed=now-sim.startedAt;sim.lastStepAt=now;
  // 메인 구간의 좌/우 점유율을 계산해 한쪽에만 몰릴 때 반대쪽 흐름을 살짝 보강한다.
  // 벽으로 끌어당기는 힘이 아니라, 중앙에서 오른쪽으로도 갈 수 있게 수평 속도만 미세 보정한다.
  const mainActive=sim.balls.filter(q=>!q.done&&now>=(q.releaseAt||0)&&q.y>180&&q.y<(sim.map.finalZone?.top||sim.map.worldH)-120);
@@ -1689,31 +1729,25 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(s
   sim.last=ts;sim.acc=0;sim.lastStepAt=ts;
  }
  if(sim&&(localRunning||state?.status==='running')&&!sim.paused&&!document.hidden){
-  let delta=Math.min(34,Math.max(0,ts-sim.last));sim.last=ts;
-  // 5배속은 고정 물리 서브스텝으로만 처리해 타이머 중복 가속과 상태 꼬임을 막는다.
-  // v11.5: 슬로우 중에도 물리 업데이트 횟수는 그대로 유지하고, 한 스텝의 시간량만 줄인다.
-  // 따라서 프레임을 건너뛰는 렉 느낌 없이 움직임 자체가 매끄럽게 느려진다.
-  sim.slowTarget=updateSlowMotion(ts);
-  const ease=1-Math.exp(-delta/920);
-  sim.slowScale+=(sim.slowTarget-sim.slowScale)*ease;
-  sim.slowScale=clamp(sim.slowScale,.14,1);
-  // 5배속 표시 중에도 한 화면 프레임에서 Box2D를 10회 이상 몰아서 계산하면
-  // 브라우저 메인 스레드가 잠기고 watchdog이 경기를 새로 시작하는 문제가 생긴다.
-  // 물리 스텝은 프레임당 최대 3회로 제한하고, 실제 결과 가속은 중력/회전체/배출 보조로 처리한다.
-  const fastForwardCinematicBlocked=!!(sim.focusBallId&&(ts<(sim.finishZoomUntil||0)||(sim.winnerResolved&&sim.balls.some(b=>String(b.ballId)===String(sim.focusBallId)&&b.qualified&&!b.done))));
-  const userSpeed=(canvasDragFastForward&&!fastForwardCinematicBlocked)?1.85:1;
-  sim.acc=Math.min(34,sim.acc+delta*sim.slowScale*userSpeed);
-  const physicsStep=8.333;let ffLoops=0;
-  const maxLoops=canvasDragFastForward?3:4;
-  while(sim.acc>=physicsStep&&ffLoops<maxLoops){step(physicsStep);sim.acc-=physicsStep;ffLoops++}
-  if(sim.acc>physicsStep*1.5)sim.acc=physicsStep*1.5;
-  const snapshotGap=sim.balls.length>800?70:sim.balls.length>500?55:sim.balls.length>250?45:32;if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
+  const physicsStep=8.333;
+  if(!Number.isFinite(sim.sharedTick))sim.sharedTick=0;
+  const elapsed=Math.max(0,syncNow()-Number(state?.startedAt||syncNow()));
+  const targetTick=Math.floor(elapsed/physicsStep);
+  let missing=Math.max(0,targetTick-sim.sharedTick);
+  // 모든 화면은 같은 서버 타임라인의 같은 tick 번호까지 계산한다.
+  // 한 프레임에 과도한 계산을 몰아 브라우저가 멈추지 않도록 제한한다.
+  const maxCatch=(sim.balls?.length||0)>800?3:8;
+  let loops=Math.min(missing,maxCatch);
+  while(loops-->0){step(physicsStep);sim.sharedTick++}
+  // 스냅샷은 시작한 화면만 복구용으로 저주기 저장. 다른 화면에는 진행 중 적용하지 않는다.
+  const snapshotGap=sim.balls.length>800?900:sim.balls.length>500?700:sim.balls.length>250?550:420;
+  if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
  }
  const mh=map.worldH||H,renderBaseScale=Math.min((w-250)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
  const q=(r)=>ys.length?ys[Math.min(ys.length-1,Math.floor((ys.length-1)*r))]:mh-200;
  // 현재 목표 당첨 순번까지의 진행률. 예: 목표 55번, 현재 30번이면 약 55% 진행.
  let cameraNextRank=sim?.finish?.length?sim.finish.length+1:1,cameraTargetRank=0,cameraProgress=0;
- if(role==='admin'&&sim){
+ if(sim){
   const cameraUpcoming=winningTargetRanks().filter(r=>r>=cameraNextRank).sort((a,b)=>a-b);
   cameraTargetRank=cameraUpcoming[0]||0;
   cameraProgress=cameraTargetRank?clamp((cameraNextRank-1)/Math.max(1,cameraTargetRank-1),0,1):0;
@@ -1722,7 +1756,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(s
  const leadCut=ys.length?q(.68):0,leadGroup=active.filter(b=>b.y>=leadCut).sort((a,b)=>a.x-b.x);
  const median=(arr,key,fallback)=>arr.length?arr[Math.floor((arr.length-1)/2)][key]:fallback;
  let focusY=q(.74),targetCam=clamp(focusY-h*.43,0,mh-h+40),nearFinish=q(.80)>mh-820;
- if(role==='admin'&&sim&&map.finalZone&&map.type!=='greed'&&!sim.bottomCameraLocked){
+ if(sim&&map.finalZone&&map.type!=='greed'&&!sim.bottomCameraLocked){
   const bottomEntrants=active.filter(b=>b.y>=map.finalZone.top-110);
   // 목표 당첨이 멀리 남아 있을 때는 하단에 고정하지 않고, 중간 지형과 하단을 오가며 보여준다.
   const allowBottomLock=!cameraTargetRank||cameraProgress>=.82;
@@ -1996,7 +2030,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(s
   sim.camX=liveViewW>=W?W/2:clamp(Number(sim.camX)||W/2,liveViewW*.5,W-liveViewW*.5);
   sim.cam=clamp(Number(sim.cam)||0,0,Math.max(0,mh-liveViewH));
  }else{targetCam=(renderRemoteSnapshot||state?.snapshot)?.cam||targetCam}
- const cam=role==='admin'&&sim?sim.cam:targetCam,camX=role==='admin'&&sim?sim.camX:Number((renderRemoteSnapshot||state?.snapshot)?.camX||W/2);let zoom=role==='admin'&&sim?sim.camZoom:Number((renderRemoteSnapshot||state?.snapshot)?.camZoom||desiredZoom);
+ const cam=sim?sim.cam:targetCam,camX=sim?sim.camX:Number((renderRemoteSnapshot||state?.snapshot)?.camX||W/2);let zoom=sim?sim.camZoom:Number((renderRemoteSnapshot||state?.snapshot)?.camZoom||desiredZoom);
  if(role==='admin'&&sim&&winnerCinematic){const zp=clamp((performance.now()-sim.finishZoomStart)/(sim.firstWinnerPreview?260:420),0,1);const ez=zp*zp*(3-2*zp);zoom+=ez*(sim.firstWinnerPreview?.05:.07)}
  const baseScale=renderBaseScale,sx=baseScale*zoom,viewCenter=w/2,ox=viewCenter-camX*sx;
  x.save();x.translate(ox,-cam*sx);x.scale(sx,sx);drawMap(x,map,theme);map.rot.forEach((r,i)=>{const a=role==='admin'&&sim?r.a:(state?.snapshot?.rot?.[i]||0),co=Math.cos(a),si=Math.sin(a);x.strokeStyle=theme.line;x.shadowColor=theme.glow;x.shadowBlur=18;x.lineWidth=16;x.beginPath();x.moveTo(r.x-co*r.len/2,r.y-si*r.len/2);x.lineTo(r.x+co*r.len/2,r.y+si*r.len/2);x.stroke();x.shadowBlur=0});if(map.gate){const a=role==='admin'&&sim?map.gate.a:Number(state?.snapshot?.gate||0),co=Math.cos(a),si=Math.sin(a),half=map.gate.len/2;x.save();x.strokeStyle=theme.line;x.shadowColor=theme.glow;x.shadowBlur=22;x.lineWidth=18;x.lineCap='round';x.beginPath();x.moveTo(map.gate.pivotX-co*half,map.gate.pivotY-si*half);x.lineTo(map.gate.pivotX+co*half,map.gate.pivotY+si*half);x.stroke();x.fillStyle='#fff';x.beginPath();x.arc(map.gate.pivotX,map.gate.pivotY,11,0,Math.PI*2);x.fill();x.restore()}
@@ -2122,8 +2156,8 @@ function drawMinimap(source,map,cam,viewWorldH){
  for(const q of map.bum){x.beginPath();x.arc(mx(q.x),my(q.y),Math.max(2,q.r*scale),0,7);x.fill()}
  for(const q of map.kick||[]){x.beginPath();x.arc(mx(q.x),my(q.y),Math.max(2,q.r*scale),0,7);x.fill()}
  x.strokeStyle=theme.line;x.globalAlpha=.95;x.lineWidth=Math.max(1.2,8*scale);
- for(let i=0;i<map.rot.length;i++){const r=map.rot[i],a=(role==='admin'&&sim)?r.a:(state?.snapshot?.rot?.[i]??r.a),co=Math.cos(a),si=Math.sin(a);x.beginPath();x.moveTo(mx(r.x-co*r.len/2),my(r.y-si*r.len/2));x.lineTo(mx(r.x+co*r.len/2),my(r.y+si*r.len/2));x.stroke()}
- if(map.gate){const a=(role==='admin'&&sim)?map.gate.a:Number(state?.snapshot?.gate||map.gate.a),co=Math.cos(a),si=Math.sin(a),half=map.gate.len/2;x.lineWidth=Math.max(1.4,10*scale);x.beginPath();x.moveTo(mx(map.gate.pivotX-co*half),my(map.gate.pivotY-si*half));x.lineTo(mx(map.gate.pivotX+co*half),my(map.gate.pivotY+si*half));x.stroke()}
+ for(let i=0;i<map.rot.length;i++){const r=map.rot[i],a=sim?r.a:(state?.snapshot?.rot?.[i]??r.a),co=Math.cos(a),si=Math.sin(a);x.beginPath();x.moveTo(mx(r.x-co*r.len/2),my(r.y-si*r.len/2));x.lineTo(mx(r.x+co*r.len/2),my(r.y+si*r.len/2));x.stroke()}
+ if(map.gate){const a=sim?map.gate.a:Number(state?.snapshot?.gate||map.gate.a),co=Math.cos(a),si=Math.sin(a),half=map.gate.len/2;x.lineWidth=Math.max(1.4,10*scale);x.beginPath();x.moveTo(mx(map.gate.pivotX-co*half),my(map.gate.pivotY-si*half));x.lineTo(mx(map.gate.pivotX+co*half),my(map.gate.pivotY+si*half));x.stroke()}
  x.globalAlpha=1;
  const liveMini=source.filter(b=>!b.done),miniStep=Math.max(1,Math.ceil(liveMini.length/180));
  for(let bi=0;bi<liveMini.length;bi+=miniStep){const b=liveMini[bi];x.fillStyle=getNameColor(b.name,1);x.beginPath();x.arc(mx(b.x),my(b.y),Math.max(1.15,R*scale),0,7);x.fill()}
