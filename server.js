@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT || 8787);
 const ROOT = __dirname;
 const rooms = new Map();
 const roomStreams = new Map();
+const roomSockets = new Map();
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -132,7 +133,7 @@ function asRanks(values) {
 }
 
 function responseState(res, room, extra = {}) {
-  json(res, 200, { ok: true, state: clientState(room), serverNow: now(), ...extra });
+  json(res, 200, { ok: true, state: clientState(room), ...extra });
 }
 
 function clientState(room) {
@@ -241,12 +242,12 @@ function handleAction(res, data) {
       room.snapshotSeq = 0;
       room.raceId += 1;
       if (!(room.seed > 0)) room.seed = randomSeed();
-      room.startedAt = now() + 1400;
+      room.startedAt = now() + 250;
       room.duration = 0;
       room.status = 'running';
       touch(room);
       broadcastRoom(room);
-      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks, startedAt: room.startedAt, serverNow: now() });
+      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks });
       return;
     }
     case 'snapshot': {
@@ -257,12 +258,14 @@ function handleAction(res, data) {
         if (raceId === room.raceId && seq >= Number(room.snapshotSeq || 0)) {
           room.snapshotSeq = seq;
           room.snapshot = {
+            packed: Number(data.packed || 0) === 1 ? 1 : 0,
             balls: Array.isArray(data.balls) ? data.balls : [],
             rot: Array.isArray(data.rot) ? data.rot : [],
             gate: Number(data.gate || 0),
             cam: Number(data.cam || 0),
             camX: Number(data.camX || 560),
             camZoom: Number(data.camZoom || 0.82),
+            sentAt: Number(data.sentAt || 0),
             seq, raceId
           };
           touch(room);
@@ -346,11 +349,32 @@ function writeRoomPacket(room, packet) {
 }
 
 function broadcastSnapshot(room) {
-  writeRoomPacket(room, { ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot, serverNow: now() });
+  const key = cleanRoom(room.code);
+  const clients = roomStreams.get(key);
+  if (!clients || !clients.size) return;
+  const payload = `data: ${JSON.stringify({ ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot })}\n\n`;
+  for (const res of [...clients]) {
+    try {
+      // 느린 관전자에게 이전 프레임을 계속 쌓지 않고 최신 프레임 하나만 보관한다.
+      if (res.__snapshotBlocked) { res.__latestSnapshot = payload; continue; }
+      const ok = res.write(payload);
+      if (!ok) {
+        res.__snapshotBlocked = true;
+        res.__latestSnapshot = null;
+        res.once('drain', () => {
+          res.__snapshotBlocked = false;
+          const latest = res.__latestSnapshot;
+          res.__latestSnapshot = null;
+          if (latest) { try { if (!res.write(latest)) res.__snapshotBlocked = true; } catch {} }
+        });
+      }
+    } catch { clients.delete(res); }
+  }
+  if (!clients.size) roomStreams.delete(key);
 }
 
 function broadcastInteraction(room, interaction) {
-  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction, serverNow: now() });
+  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction });
 }
 
 function broadcastRoom(room) {
@@ -383,6 +407,81 @@ function openRoomStream(req, res, code) {
   });
 }
 
+
+function wsFrame(text) {
+  const payload = Buffer.from(String(text));
+  const len = payload.length;
+  let head;
+  if (len < 126) { head = Buffer.from([0x81, len]); }
+  else if (len <= 0xffff) { head = Buffer.alloc(4); head[0] = 0x81; head[1] = 126; head.writeUInt16BE(len, 2); }
+  else { head = Buffer.alloc(10); head[0] = 0x81; head[1] = 127; head.writeBigUInt64BE(BigInt(len), 2); }
+  return Buffer.concat([head, payload]);
+}
+function wsBroadcastSnapshot(room, packet, source) {
+  const key = cleanRoom(room.code);
+  const clients = roomSockets.get(key);
+  if (!clients || !clients.size) return;
+  const frame = wsFrame(JSON.stringify(packet));
+  for (const sock of [...clients]) {
+    if (sock === source || sock.destroyed || !sock.writable) continue;
+    try {
+      // 느린 관전자는 이전 프레임을 쌓지 않고 최신 프레임만 받는다.
+      if (sock.writableLength > 260000) continue;
+      sock.write(frame);
+    } catch { clients.delete(sock); try { sock.destroy(); } catch {} }
+  }
+  if (!clients.size) roomSockets.delete(key);
+}
+function parseWsFrames(socket, chunk) {
+  socket.__wsBuffer = Buffer.concat([socket.__wsBuffer || Buffer.alloc(0), chunk]);
+  let buf = socket.__wsBuffer;
+  while (buf.length >= 2) {
+    const b0 = buf[0], b1 = buf[1], opcode = b0 & 0x0f, masked = !!(b1 & 0x80);
+    let len = b1 & 0x7f, off = 2;
+    if (len === 126) { if (buf.length < 4) break; len = buf.readUInt16BE(2); off = 4; }
+    else if (len === 127) { if (buf.length < 10) break; const n = buf.readBigUInt64BE(2); if (n > BigInt(4 * 1024 * 1024)) { socket.destroy(); return; } len = Number(n); off = 10; }
+    let mask = null;
+    if (masked) { if (buf.length < off + 4) break; mask = buf.subarray(off, off + 4); off += 4; }
+    if (buf.length < off + len) break;
+    const payload = Buffer.from(buf.subarray(off, off + len));
+    if (mask) for (let i = 0; i < payload.length; i++) payload[i] ^= mask[i & 3];
+    buf = buf.subarray(off + len);
+    if (opcode === 8) { socket.end(); break; }
+    if (opcode === 9) { try { const pong = Buffer.concat([Buffer.from([0x8a, payload.length]), payload]); socket.write(pong); } catch {} continue; }
+    if (opcode !== 1) continue;
+    try {
+      const msg = JSON.parse(payload.toString('utf8'));
+      if (msg.kind !== 'snapshot' || !msg.snapshot) continue;
+      const room = getRoom(socket.__roomCode);
+      const seq = Number(msg.snapshot.seq || msg.seq || 0);
+      if (seq <= Number(room.snapshotSeq || 0)) continue;
+      room.snapshotSeq = seq;
+      room.snapshot = msg.snapshot;
+      room.status = msg.status || room.status;
+      if (msg.raceId != null) room.raceId = Number(msg.raceId) || room.raceId;
+      touch(room);
+      wsBroadcastSnapshot(room, { kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot }, socket);
+    } catch {}
+  }
+  socket.__wsBuffer = buf;
+}
+function openSnapshotSocket(req, socket, head, url) {
+  const key = req.headers['sec-websocket-key'];
+  if (!key) return socket.destroy();
+  const accept = crypto.createHash('sha1').update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64');
+  const roomCode = cleanRoom(url.searchParams.get('room'));
+  socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ' + accept + '\r\n\r\n');
+  socket.__roomCode = roomCode; socket.__wsBuffer = Buffer.alloc(0);
+  if (!roomSockets.has(roomCode)) roomSockets.set(roomCode, new Set());
+  roomSockets.get(roomCode).add(socket);
+  socket.on('data', chunk => parseWsFrames(socket, chunk));
+  socket.on('close', () => { const set = roomSockets.get(roomCode); if (set) { set.delete(socket); if (!set.size) roomSockets.delete(roomCode); } });
+  socket.on('error', () => { try { socket.destroy(); } catch {} });
+  if (head && head.length) parseWsFrames(socket, head);
+  const room = getRoom(roomCode);
+  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot }))); } catch {}
+}
+
 function serveStatic(req, res, pathname) {
   let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   try { rel = decodeURIComponent(rel); } catch { return text(res, 400, 'Bad request'); }
@@ -411,6 +510,11 @@ const server = http.createServer(async (req, res) => {
     console.error(error);
     return json(res, 500, { ok: false, error: '서버 오류가 발생했습니다.' });
   }
+});
+
+server.on('upgrade', (req, socket, head) => {
+  try { const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`); if (url.pathname === '/api/snapshot-stream') return openSnapshotSocket(req, socket, head, url); } catch {}
+  socket.destroy();
 });
 
 server.listen(PORT, '0.0.0.0', () => {
