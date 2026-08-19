@@ -132,7 +132,7 @@ function asRanks(values) {
 }
 
 function responseState(res, room, extra = {}) {
-  json(res, 200, { ok: true, state: clientState(room), ...extra });
+  json(res, 200, { ok: true, state: clientState(room), serverNow: now(), ...extra });
 }
 
 function clientState(room) {
@@ -241,12 +241,12 @@ function handleAction(res, data) {
       room.snapshotSeq = 0;
       room.raceId += 1;
       if (!(room.seed > 0)) room.seed = randomSeed();
-      room.startedAt = now() + 250;
+      room.startedAt = now() + 1400;
       room.duration = 0;
       room.status = 'running';
       touch(room);
       broadcastRoom(room);
-      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks });
+      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks, startedAt: room.startedAt, serverNow: now() });
       return;
     }
     case 'snapshot': {
@@ -346,11 +346,11 @@ function writeRoomPacket(room, packet) {
 }
 
 function broadcastSnapshot(room) {
-  writeRoomPacket(room, { ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot });
+  writeRoomPacket(room, { ok: true, kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot, serverNow: now() });
 }
 
 function broadcastInteraction(room, interaction) {
-  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction });
+  writeRoomPacket(room, { ok: true, kind: 'interaction', interaction, serverNow: now() });
 }
 
 function broadcastRoom(room) {
