@@ -88,6 +88,26 @@ function restoreLobbyPreview(map,{clearParticipants=false}={}){
  pendingMap=null;manualCam=null;
  ui();
 }
+function clearWinnerPopupEverywhereLocal(){
+ localWinnerLatch=null;
+ winnerPopupFirstSeenAt=0;
+ lastWinnerRace=-1;
+ const card=$('winnerCard');
+ if(card){
+   card.classList.remove('show','burst','winner-pop');
+   card.removeAttribute('data-effect-profile');
+   card.style.display='none';
+   // 다음 당첨 때 기존 CSS가 다시 정상적으로 show를 제어하도록 즉시 inline display 해제.
+   requestAnimationFrame(()=>{if(card&&!card.classList.contains('show'))card.style.removeProperty('display')});
+ }
+ const names=$('winnerNames');
+ if(names){names.innerHTML='';delete names.dataset.markup}
+ if(sim){
+   sim.winnerResolved=false;sim.winnerPopupReady=false;sim.winnerPopupReadyAt=0;sim.winnerPopupNotBefore=0;
+   sim.focusBallId='';sim.finishFlash=null;sim.finishZoomStart=0;sim.finishZoomUntil=0;sim.firstWinnerPreview=false;
+ }
+}
+
 function stopLocalRace({clearParticipants=false}={}){
  lifecycleEpoch++;
  if(sim)sim.paused=true;
@@ -96,8 +116,7 @@ function stopLocalRace({clearParticipants=false}={}){
  if(state){state.status='lobby';state.finishOrder=[];state.winners=[];state.winnerDeclared=false;state.snapshot={balls:[],rot:[],gate:0,cam:0,camX:560,camZoom:.96};state.raceBalls=[];if(clearParticipants)state.participants=[]}
  // 새 판/맵 변경 즉시 이전 프레임을 지워 남은 공이 화면에 잔상으로 남지 않게 한다.
  for(const id of ['raceCanvas','minimapCanvas']){const c=$(id);if(c){const g=c.getContext('2d');g?.clearRect(0,0,c.width,c.height)}}
- const card=$('winnerCard');if(card)card.classList.remove('show','burst','winner-pop');
- const names=$('winnerNames');if(names){names.innerHTML='';delete names.dataset.markup;}
+ clearWinnerPopupEverywhereLocal();
  renderRank.lastScrollKey='';renderRank.winnerLocked=false;lastRankCount=-1;rankNodes.clear();rankStatusCache.clear();liveRankMemory.clear();remoteBallView.clear();lastRemoteFrameTs=0;
  const rankList=$('rankList');if(rankList)rankList.replaceChildren();
 }
@@ -277,6 +296,8 @@ function connectRoomEvents(){
    if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
    if(state?.raceBalls&&!incoming.raceBalls)incoming.raceBalls=state.raceBalls;
    const previousRace=state?.raceId,previousStatus=state?.status;
+   // 경기 초기화/로비 전환은 시작자·관전자 구분 없이 결과 팝업을 즉시 제거한다.
+   if(previousStatus==='running'&&incoming.status!=='running')clearWinnerPopupEverywhereLocal();
    // 서버 상태가 방의 정답이다. 다른 사람이 초기화/맵변경/당첨기준 변경하면 현재 화면도 즉시 같은 상태로 맞춘다.
    if(localRunning&&incoming.status!=='running'){
     cancelSyncStart();
@@ -335,10 +356,13 @@ async function pumpViewerFrame(){
         remoteSnapshotReceivedAt=performance.now();
         state.snapshot=snap;
       }
+      if(j.status&&j.status!=='running'&&state.status==='running'){
+        clearWinnerPopupEverywhereLocal();
+      }
       if(j.status)state.status=j.status;
-      if(Array.isArray(j.finishOrder))state.finishOrder=j.finishOrder;
-      if(Array.isArray(j.winners))state.winners=j.winners;
-      state.winnerDeclared=!!j.winnerDeclared;
+      if(Array.isArray(j.finishOrder))state.finishOrder=j.status==='running'?j.finishOrder:[];
+      if(Array.isArray(j.winners))state.winners=j.status==='running'?j.winners:[];
+      state.winnerDeclared=j.status==='running'?!!j.winnerDeclared:false;
       if(j.winnerPopupAt!=null)state.winnerPopupAt=Number(j.winnerPopupAt)||0;
     }
   }catch(_){}
@@ -372,6 +396,8 @@ else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
 if(!isRaceHost()&&state?.status==='running'&&renderRemoteSnapshot?.balls?.length&&!(incoming.snapshot?.balls||[]).length){
  incoming.snapshot=renderRemoteSnapshot;
 }
+const prevPollStatus=state?.status;
+if(prevPollStatus==='running'&&incoming.status!=='running')clearWinnerPopupEverywhereLocal();
 state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&Number(state.raceId)!==Number(lastRace)){scheduleSharedRace(state)}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?(isRaceHost()?260:80):320)}}
 function parseBulk(t){return t.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.*?)(?:\s*[xX*×]\s*(\d+))?$/);return{name:(m?.[1]||'').trim(),count:Math.max(1,Number(m?.[2]||1)|0)}}).filter(x=>x.name)}
 function bindAdmin(){
@@ -429,12 +455,15 @@ function bindAdmin(){
  $('applyWin').onclick=()=>{const checked=document.querySelector('input[name=win]:checked');if(!checked)return;saveWin(checked.value)};
  $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;localStartHardNotBefore=performance.now()+5000;showStartCountdown();const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;localWinnerLatch=null;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();showStartCountdown();if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
   if(resetInFlight)return;
+  // 누르는 즉시 이 화면의 결과 팝업 제거.
+  clearWinnerPopupEverywhereLocal();
   resetInFlight=true;mutationBusy=true;
   const btn=$('resetBtn');if(btn){btn.disabled=true;btn.textContent='새 판 준비 중'}
   try{
    const j=await apiQuiet('resetRace',{},8000);
    if(!j?.ok)throw Error(j?.error||'초기화 오류');
    cancelSyncStart();stopStartCountdown();localStartHardNotBefore=0;localWinnerLatch=null;stopLocalRace({clearParticipants:false});
+   clearWinnerPopupEverywhereLocal();
    if(j.state)state=j.state;
    winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
    ui();flash('경기 초기화 전체 화면 적용 완료');

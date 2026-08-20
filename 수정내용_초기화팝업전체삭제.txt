@@ -1,0 +1,11 @@
+경기 초기화 시 결과팝업 전체 화면 삭제
+
+- 경기 초기화 버튼을 누른 화면: 클릭 즉시 Winner 결과팝업 제거.
+- 서버 초기화 완료 후 한 번 더 제거.
+- 다른 관전자 화면: EventSource에서 running -> lobby 전환 감지 즉시 제거.
+- EventSource를 놓친 화면: /api/state poll에서 전환 감지 시 제거.
+- 관전자 전용 /api/frame에서도 non-running 상태 감지 시 제거.
+- winnerNames, localWinnerLatch, winnerPopupFirstSeenAt, lastWinnerRace, focus/flash/zoom 상태까지 함께 초기화.
+- 초기화 이후 늦게 도착한 예전 winners/finishOrder가 팝업을 다시 띄우지 않도록 frame pump에서 lobby일 때 결과 배열을 비움.
+
+기존 관전자 프레임 펌프, 원래 공속도, 시작자 빠른 팝업, 마지막 당첨공 연출 유지.
