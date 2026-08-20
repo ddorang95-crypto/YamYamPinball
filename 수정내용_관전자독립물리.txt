@@ -1,0 +1,19 @@
+관전자 독립 물리 + 서버 tick 동기화 v1
+
+목표:
+- 관전자가 시작자의 snapshot 전송을 기다리느라 3~5초 늦고 끊기는 구조 제거.
+
+변경:
+1. 시작자와 관전자 모두 서버가 정한 동일 raceId / seed / startedAt으로 자기 브라우저에서 startPhysics().
+2. 모든 화면은 syncNow() - state.startedAt으로 동일 targetTick을 계산.
+3. 관전자는 진행 중 host snapshot 좌표를 적용하지 않음. 따라서 host 네트워크/CPU 렉을 따라가지 않음.
+4. 관전자도 자신의 sim.balls를 직접 렌더링.
+5. snapshot/finish 결과 서버 전송은 기존대로 raceHost만 수행.
+6. 관전자 프레임이 잠깐 늦으면 서버 targetTick까지 제한된 catch-up step으로 따라잡음.
+7. 카메라 계산도 각 화면의 동일 local sim 기준으로 실행.
+
+주의:
+- Box2D/WASM은 동일 seed와 동일 고정 tick을 사용해 최대한 같은 결과를 내도록 구성.
+- 서로 다른 브라우저/CPU에서 장시간 부동소수점 물리 결과가 미세하게 갈라질 가능성은 존재함.
+- 최종 당첨 데이터는 여전히 host가 서버에 기록한 결과가 정답.
+- 이 버전은 snapshot 지연/렉 제거를 우선 테스트하는 1단계 독립물리 버전.
