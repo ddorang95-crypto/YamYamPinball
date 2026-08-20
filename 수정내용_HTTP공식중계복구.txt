@@ -1,0 +1,20 @@
+관전자 공이 계속 안 움직이는 문제 - 공식 서버 snapshot 강제 갱신
+
+핵심 원인:
+- sendSnapshot()에서 WebSocket 전송이 성공하면 즉시 return하고 있었음.
+- 따라서 /api/action snapshot이 호출되지 않아 서버 room.snapshot이 실시간으로 갱신되지 않는 구조였음.
+- WebSocket 중계가 브라우저/Render 프록시 환경에서 제대로 전달되지 않는 관전자는
+  /api/state와 SSE를 fallback으로 봐도 서버에 최신 공 좌표가 없어서 정지 화면만 보게 됨.
+
+수정:
+1. 시작자는 WebSocket 전송 성공 여부와 상관없이 서버 HTTP snapshot도 계속 갱신.
+2. WebSocket = 빠른 실시간 1차 경로.
+3. HTTP room.snapshot = 반드시 살아있는 2차 공식 경로.
+4. 서버 HTTP snapshot action은 기존 broadcastSnapshot()으로 SSE 관전자에게도 즉시 전파.
+5. 관전자 /api/state fallback 주기를 경기 중 80ms로 단축.
+6. HTTP에서 순간 빈 snapshot이 와도 이미 받은 live remote frame을 빈 화면으로 덮어쓰지 않음.
+7. 관전자 독립물리 없음. 시작자 공식 물리/속도/연출 그대로 중계.
+8. 기본 공속도 원래대로 복원한 직전 버전 유지.
+
+이제 WebSocket이 Render에서 막혀도 HTTP + SSE 경로로 공 위치와 카메라가 계속 전달되어야 함.
+app.js 수정 핵심, server.js 포함.
