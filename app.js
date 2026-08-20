@@ -1230,6 +1230,18 @@ function stepOriginalBox2D(dt){
   }
   if(!b.done&&b.qualified){
    const isWinner=winningTargetRanks().includes(b.rank);
+
+   // 욕망의 항아리에서는 결승선을 통과해 순위가 확정된 일반 공은
+   // 아래 바닥까지 계속 시뮬레이션하지 않고 즉시 물리 월드에서 제거한다.
+   // 오른쪽 순위표에는 기록이 남지만 메인 캔버스/충돌 계산에서는 사라져 후반 렉을 줄인다.
+   if(state?.map==='greed'&&!isWinner){
+    b.done=true;
+    try{world.DestroyBody(body)}catch(_){}
+    bodies.delete(String(b.ballId));
+    continue;
+   }
+
+   // 실제 당첨공만 기존 식별/클로즈업 연출 동안 잠깐 유지한다.
    if(isWinner&&Number(b.winnerHoldUntil||0)>now){
     try{
       const holdY=Number(stage.goalY)+2.4;
@@ -1239,9 +1251,9 @@ function stepOriginalBox2D(dt){
     }catch(_){}
    }
    const winnerCloseupDone=isWinner&&Number.isFinite(Number(b.winnerHideAt))&&now>=Number(b.winnerHideAt);
-   if((isWinner&&now>=Number(b.winnerHoldUntil||0)&&wpY>stage.goalY+12)||(!isWinner&&wpY>stage.goalY+12)){
-    b.done=true;world.DestroyBody(body);bodies.delete(String(b.ballId));
-    if(isWinner&&sim.winnerResolved){
+   if(isWinner&&now>=Number(b.winnerHoldUntil||0)&&wpY>stage.goalY+5){
+    b.done=true;try{world.DestroyBody(body)}catch(_){}bodies.delete(String(b.ballId));
+    if(sim.winnerResolved){
      sim.winnerPopupReady=true;sim.winnerPopupReadyAt=Math.max(now,Number(sim.winnerPopupNotBefore||0));sim.firstWinnerPreview=false;
      sim.focusBallId='';sim.finishZoomStart=0;sim.finishZoomUntil=0;
      const mainReturnY=Math.max(0,(sim.map.finalZone?.top??sim.map.finishY-700)-260);
