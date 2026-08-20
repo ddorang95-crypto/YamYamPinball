@@ -480,7 +480,7 @@ function latchLocalWinner(ball){
  if(!localWinnerLatch||Number(localWinnerLatch.raceId)!==Number(state.raceId)){
    localWinnerLatch={
      raceId:Number(state.raceId)||0,
-     popupAtPerf:performance.now()+2200,
+     popupAtPerf:performance.now()+700,
      winner:{ballId:ball.ballId,name:ball.name,copy:ball.copy,owner:ball.owner,ownerInitial:ball.ownerInitial,rank}
    };
  }
