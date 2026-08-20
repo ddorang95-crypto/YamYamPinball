@@ -244,7 +244,7 @@ function handleAction(res, data) {
       room.snapshotSeq = 0;
       room.raceId += 1;
       if (!(room.seed > 0)) room.seed = randomSeed();
-      room.startedAt = now() + 820;
+      room.startedAt = now() + 5000;
       room.duration = 0;
       room.raceHostId = String(data.clientId || '');
       room.status = 'running';
