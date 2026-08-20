@@ -185,6 +185,10 @@ function scheduleSharedRace(incoming){
  const begin=()=>{
   syncStartTimer=0;
   if(!state||state.status!=='running'||Number(state.raceId)!==rid)return;
+  const remain=Number(state.startedAt||incoming.startedAt||0)-syncNow();
+  // 서버가 정한 공통 시작시각 전에는 어떤 PC에서도 절대 물리를 시작하지 않는다.
+  // 타이머가 일찍 깨거나 브라우저 시계 보정이 중간에 바뀌어도 다시 남은 시간만큼 기다린다.
+  if(remain>20){syncStartTimer=setTimeout(begin,Math.max(20,remain));return}
   stopLocalRace({clearParticipants:false});
   lastRace=rid;raceHostId=String(state.raceHostId||'');snapshotSeq=0;lastAcceptedSnapshotSeq=0;
   remoteFrameBuffer.length=0;renderRemoteSnapshot=null;
@@ -315,7 +319,7 @@ function bindAdmin(){
   }
  };
  $('applyWin').onclick=()=>{const checked=document.querySelector('input[name=win]:checked');if(!checked)return;saveWin(checked.value)};
- $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');syncNoteClock(j.serverNow);state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();flash('모든 화면 동시 시작!');if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
+ $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');syncNoteClock(j.serverNow);state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();flash('5초 뒤 모든 화면 동시 출발 준비!');if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
   if(resetInFlight)return;
   resetInFlight=true;mutationBusy=true;
   const btn=$('resetBtn');if(btn){btn.disabled=true;btn.textContent='새 판 준비 중'}
@@ -763,31 +767,43 @@ function greedNeonBoundsAtY(y){
  return{left:left+.34,right:right-.34};
 }
 
-function originalPolylineXAtY(points,y){
- if(!Array.isArray(points)||points.length<2)return null;
- const hits=[];
- for(let i=0;i<points.length-1;i++){
-  const a=points[i],b=points[i+1],y1=Number(a[1]),y2=Number(b[1]);
-  if(!Number.isFinite(y1)||!Number.isFinite(y2))continue;
-  if(y<Math.min(y1,y2)-1e-6||y>Math.max(y1,y2)+1e-6)continue;
-  if(Math.abs(y2-y1)<1e-8){hits.push(Number(a[0]),Number(b[0]));continue}
-  const t=(y-y1)/(y2-y1);
-  hits.push(Number(a[0])+(Number(b[0])-Number(a[0]))*t);
- }
- return hits.filter(Number.isFinite);
-}
+const ORIGINAL_WHEEL_BOUND_SEGMENTS=(()=>{
+ const polys=(ORIGINAL_WHEEL_STAGE.entities||[]).filter(e=>e?.type==='static'&&e?.shape?.type==='polyline').slice(0,2);
+ return polys.map(e=>{
+  const p=e.shape.points||[],out=[];
+  for(let i=0;i<p.length-1;i++){
+   const x1=Number(p[i][0]),y1=Number(p[i][1]),x2=Number(p[i+1][0]),y2=Number(p[i+1][1]);
+   if(![x1,y1,x2,y2].every(Number.isFinite))continue;
+   out.push({x1,y1,x2,y2,minY:Math.min(y1,y2),maxY:Math.max(y1,y2),dy:y2-y1});
+  }
+  return out;
+ });
+})();
+const ORIGINAL_WHEEL_BOUND_CACHE=new Map();
 function originalWheelSafeBoundsAtY(y){
- const st=ORIGINAL_WHEEL_STAGE;
- const polys=(st.entities||[]).filter(e=>e?.type==='static'&&e?.shape?.type==='polyline');
- // 원본 wheel의 첫 두 polyline이 화면에 보이는 좌/우 외곽선이다.
- if(polys.length<2)return null;
- const L=originalPolylineXAtY(polys[0].shape.points,Number(y));
- const R=originalPolylineXAtY(polys[1].shape.points,Number(y));
- if(!L?.length||!R?.length)return null;
+ const yy=Number(y);if(!Number.isFinite(yy))return null;
+ // 0.1 world-unit 단위로 캐시해 수백/수천 공에서도 같은 계산을 반복하지 않는다.
+ const key=Math.round(yy*10);
+ if(ORIGINAL_WHEEL_BOUND_CACHE.has(key))return ORIGINAL_WHEEL_BOUND_CACHE.get(key);
+ const sy=key/10,hits=[];
+ for(const segs of ORIGINAL_WHEEL_BOUND_SEGMENTS){
+  const xs=[];
+  for(const q of segs){
+   if(sy<q.minY-.0001||sy>q.maxY+.0001)continue;
+   if(Math.abs(q.dy)<1e-8){xs.push(q.x1,q.x2);continue}
+   const t=(sy-q.y1)/q.dy;
+   xs.push(q.x1+(q.x2-q.x1)*t);
+  }
+  hits.push(xs);
+ }
+ const L=hits[0]||[],R=hits[1]||[];
+ if(!L.length||!R.length){ORIGINAL_WHEEL_BOUND_CACHE.set(key,null);return null}
  const left=Math.min(...L),right=Math.max(...R);
- if(!Number.isFinite(left)||!Number.isFinite(right)||right-left<.7)return null;
- return {left,right};
+ const v=(Number.isFinite(left)&&Number.isFinite(right)&&right-left>=.7)?{left,right}:null;
+ ORIGINAL_WHEEL_BOUND_CACHE.set(key,v);
+ return v;
 }
+
 function containOriginalBallInsideVisibleMap(body,B,pos,vel){
  if(!body||!pos||!sim)return pos;
  const type=String(state?.map||sim?.map?.type||'');
@@ -797,6 +813,10 @@ function containOriginalBallInsideVisibleMap(body,B,pos,vel){
 
  // Wheel은 화면에 그려진 실제 좌/우 polyline 사이에만 공이 존재하도록 한다.
  if(type!=='wheel')return pos;
+ // 대부분의 공은 중앙에 있으므로 빠른 넓은 범위 검사로 바로 통과시킨다.
+ // 실제 외곽선 근처에 있는 공만 정밀 경계 계산을 수행해 시작자 CPU 부하를 크게 줄인다.
+ if(pos.x>9.4&&pos.x<16.6&&pos.y<9)return pos;
+ if(pos.x>3.0&&pos.x<23.0&&pos.y>=9&&pos.y<99)return pos;
  const bd=originalWheelSafeBoundsAtY(pos.y);
  if(!bd)return pos;
 
@@ -1826,7 +1846,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   let loops=Math.min(missing,maxCatch);
   while(loops-->0){step(physicsStep);sim.sharedTick++}
   // 스냅샷은 시작한 화면만 복구용으로 저주기 저장. 다른 화면에는 진행 중 적용하지 않는다.
-  const snapshotGap=sim.balls.length>800?110:sim.balls.length>500?80:sim.balls.length>250?55:32;
+  const snapshotGap=sim.balls.length>800?150:sim.balls.length>500?115:sim.balls.length>250?75:40;
   if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
  }
  const mh=map.worldH||H,renderBaseScale=Math.min((w-250)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
