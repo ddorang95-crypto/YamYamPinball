@@ -1,0 +1,18 @@
+이번 수정은 사용자가 올린 '얌얌랜드 핀볼 최신판.zip'을 기준으로 app.js만 최소 수정했습니다.
+
+수정 1. 경기초기화 후 관전자 팝업 잔류
+- 관전자는 localRunning=false라서 기존 stopLocalRace()가 실행되지 않았고 winnerCard가 남아있던 문제.
+- 서버 상태가 running -> lobby로 바뀌면 host/관전자 구분 없이 winnerCard, winnerNames, rankList,
+  remote snapshot buffer, winner animation 상태를 즉시 초기화.
+- EventSource가 잠깐 끊겼을 때 poll로 lobby 상태를 받는 경우도 동일하게 초기화.
+
+수정 2. 관전자 공 크기 / 화면 비율 차이
+- host가 실제로 보는 raceCanvas의 viewW/viewH를 snapshot에 함께 저장.
+- 관전자는 자기 브라우저 크기로 world scale을 새로 계산하지 않고 host viewport를 기준으로 fit.
+- 창 비율이 다르면 핀볼 화면 영역만 비율 유지하여 맞추므로 공 크기와 보이는 월드 범위가 host와 동일한 구성으로 유지.
+- 관전자 cam/camX/camZoom/회전바/gate도 동일한 보간 snapshot을 기준으로 표시.
+- HTML/CSS/UI 배치는 수정하지 않음.
+
+검증
+- app.js 문법검사 통과
+- server.js 문법검사 통과

@@ -268,7 +268,7 @@ function handleAction(res, data) {
             cam: Number(data.cam || 0),
             camX: Number(data.camX || 560),
             camZoom: Number(data.camZoom || 0.82),
-            sentAt: now(),
+            sentAt: Number(data.sentAt || 0),
             seq, raceId
           };
           touch(room);
@@ -421,21 +421,19 @@ function wsFrame(text) {
   return Buffer.concat([head, payload]);
 }
 function wsBroadcastSnapshot(room, packet, source) {
-  const key=cleanRoom(room.code),clients=roomSockets.get(key);
-  if(!clients||!clients.size)return;
-  const frame=wsFrame(JSON.stringify(packet));
-  for(const sock of [...clients]){
-    if(sock.destroyed||!sock.writable)continue;
-    try{
-      // 느린 화면에는 과거 프레임을 쌓지 않고 최신 프레임만 남긴다.
-      if(sock.writableLength>160000){sock.__latestSnapshotFrame=frame;continue}
+  const key = cleanRoom(room.code);
+  const clients = roomSockets.get(key);
+  if (!clients || !clients.size) return;
+  const frame = wsFrame(JSON.stringify(packet));
+  for (const sock of [...clients]) {
+    if (sock === source || sock.destroyed || !sock.writable) continue;
+    try {
+      // 느린 관전자는 이전 프레임을 쌓지 않고 최신 프레임만 받는다.
+      if (sock.writableLength > 260000) continue;
       sock.write(frame);
-      if(sock.__latestSnapshotFrame&&sock.writableLength<70000){
-        const latest=sock.__latestSnapshotFrame;sock.__latestSnapshotFrame=null;sock.write(latest);
-      }
-    }catch{clients.delete(sock);try{sock.destroy()}catch{}}
+    } catch { clients.delete(sock); try { sock.destroy(); } catch {} }
   }
-  if(!clients.size)roomSockets.delete(key);
+  if (!clients.size) roomSockets.delete(key);
 }
 function parseWsFrames(socket, chunk) {
   socket.__wsBuffer = Buffer.concat([socket.__wsBuffer || Buffer.alloc(0), chunk]);
@@ -461,7 +459,7 @@ function parseWsFrames(socket, chunk) {
       const seq = Number(msg.snapshot.seq || msg.seq || 0);
       if (seq <= Number(room.snapshotSeq || 0)) continue;
       room.snapshotSeq = seq;
-      room.snapshot = {...msg.snapshot,sentAt:now()};
+      room.snapshot = msg.snapshot;
       room.status = msg.status || room.status;
       if (msg.raceId != null) room.raceId = Number(msg.raceId) || room.raceId;
       touch(room);
@@ -484,7 +482,7 @@ function openSnapshotSocket(req, socket, head, url) {
   socket.on('error', () => { try { socket.destroy(); } catch {} });
   if (head && head.length) parseWsFrames(socket, head);
   const room = getRoom(roomCode);
-  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot ? {...room.snapshot,sentAt:now()} : room.snapshot }))); } catch {}
+  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot }))); } catch {}
 }
 
 function serveStatic(req, res, pathname) {
