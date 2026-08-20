@@ -452,16 +452,53 @@ function wsBroadcastSnapshot(room, packet, source) {
   const clients = roomSockets.get(key);
   if (!clients || !clients.size) return;
   const frame = wsFrame(JSON.stringify(packet));
+
+  const flushLatest = (sock) => {
+    if (!sock || sock.destroyed || !sock.writable || !sock.__latestWsFrame) return;
+    if (sock.writableLength > 90000) return;
+    const latest = sock.__latestWsFrame;
+    sock.__latestWsFrame = null;
+    try {
+      const ok = sock.write(latest);
+      if (!ok) sock.once('drain', () => flushLatest(sock));
+    } catch {}
+  };
+
   for (const sock of [...clients]) {
     if (sock === source || sock.destroyed || !sock.writable) continue;
     try {
-      // 느린 관전자는 이전 프레임을 쌓지 않고 최신 프레임만 받는다.
-      if (sock.writableLength > 260000) continue;
-      sock.write(frame);
-    } catch { clients.delete(sock); try { sock.destroy(); } catch {} }
+      // 느린 관전자에게 오래된 프레임을 큐로 쌓지 않는다.
+      // 송신 버퍼가 차 있으면 현재 프레임은 '최신 1개'로 교체하고 drain 후 그것만 보낸다.
+      if (sock.writableLength > 90000) {
+        sock.__latestWsFrame = frame;
+        if (!sock.__latestDrainBound) {
+          sock.__latestDrainBound = true;
+          sock.once('drain', () => {
+            sock.__latestDrainBound = false;
+            flushLatest(sock);
+          });
+        }
+        continue;
+      }
+      const ok = sock.write(frame);
+      if (!ok) {
+        sock.__latestWsFrame = frame;
+        if (!sock.__latestDrainBound) {
+          sock.__latestDrainBound = true;
+          sock.once('drain', () => {
+            sock.__latestDrainBound = false;
+            flushLatest(sock);
+          });
+        }
+      }
+    } catch {
+      clients.delete(sock);
+      try { sock.destroy(); } catch {}
+    }
   }
   if (!clients.size) roomSockets.delete(key);
 }
+
 function parseWsFrames(socket, chunk) {
   socket.__wsBuffer = Buffer.concat([socket.__wsBuffer || Buffer.alloc(0), chunk]);
   let buf = socket.__wsBuffer;

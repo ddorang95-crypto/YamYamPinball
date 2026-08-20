@@ -2,7 +2,7 @@
 'use strict';
 const YamyamApp=(()=>{
 const qs=new URLSearchParams(location.search),room=(qs.get('room')||'YAMYAM').replace(/[^A-Za-z0-9_-]/g,'').toUpperCase();
-let role='display',unifiedMode=false,eventSource=null,state=null,owner='',sim=null,lastRace=-1,polling=false,lastRankCount=-1,lastWinnerRace=-1,pendingWinMode=null,mutationBusy=false,winDraft=null,winSaveTimer=0,winSaveInFlight=false,winSaveQueued=false,localRunning=false,localRaceConfig=null,manualCam=null,snapshotInFlight=false,connectionFailures=0,resetInFlight=false,lifecycleEpoch=0,pendingMap=null,selectedMapLock=null,serverStateSuppressedUntil=0,lastRenderErrorAt=0,remoteBallView=new Map(),lastRemoteFrameTs=0,nameHueMap=new Map(),nextNameHueIndex=0,nameColorSignature='',winnerPopupFirstSeenAt=0,mapChangeToken=0,canvasDragFastForward=false,suppressNextCanvasClick=false,raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,snapshotSocket=null,snapshotSocketReady=false,snapshotSocketRetry=0,remoteFrameBuffer=[],renderRemoteSnapshot=null,remotePlaybackDelayMs=95;
+let role='display',unifiedMode=false,eventSource=null,state=null,owner='',sim=null,lastRace=-1,polling=false,lastRankCount=-1,lastWinnerRace=-1,pendingWinMode=null,mutationBusy=false,winDraft=null,winSaveTimer=0,winSaveInFlight=false,winSaveQueued=false,localRunning=false,localRaceConfig=null,manualCam=null,snapshotInFlight=false,connectionFailures=0,resetInFlight=false,lifecycleEpoch=0,pendingMap=null,selectedMapLock=null,serverStateSuppressedUntil=0,lastRenderErrorAt=0,remoteBallView=new Map(),lastRemoteFrameTs=0,nameHueMap=new Map(),nextNameHueIndex=0,nameColorSignature='',winnerPopupFirstSeenAt=0,mapChangeToken=0,canvasDragFastForward=false,suppressNextCanvasClick=false,raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,snapshotSocket=null,snapshotSocketReady=false,snapshotSocketRetry=0,remoteFrameBuffer=[],renderRemoteSnapshot=null,remotePlaybackDelayMs=0;
 const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ADMIN_PREFS_KEY='yamyam_pinball_admin_prefs_'+room;
 // 모든 맵이 공유하는 기본 핀볼 연출 설정. 맵을 바꾸거나 경기를 초기화해도 이 값은 사라지지 않는다.
@@ -58,38 +58,28 @@ function normalizeSnapshot(snap){
 
 function queueRemoteSnapshot(snap){
  if(isRaceHost()||!snap||!Array.isArray(snap.balls))return;
- const sentAt=Number(snap.sentAt)||Date.now();
  const seq=Number(snap.seq)||0;
- const frame={...snap,sentAt,_arrivalAt:Date.now(),seq};
- const last=remoteFrameBuffer[remoteFrameBuffer.length-1];
- if(last&&seq&&Number(last.seq||0)>=seq)return;
+ if(seq&&seq<lastAcceptedSnapshotSeq)return;
+
+ const sentAt=Number(snap.sentAt)||syncNow();
+ const age=Math.max(0,syncNow()-sentAt);
+
+ // 관전자가 몇 초 밀린 오래된 프레임을 순서대로 재생하지 않도록 한다.
+ // 900ms보다 오래된 backlog 프레임은 버리고 '현재에 가까운 최신 프레임'만 표시한다.
+ if(age>900 && renderRemoteSnapshot)return;
+
+ const frame={...snap,sentAt,_arrivalAt:performance.now(),seq};
+ remoteFrameBuffer.length=0;
  remoteFrameBuffer.push(frame);
- if(remoteFrameBuffer.length>90)remoteFrameBuffer.splice(0,remoteFrameBuffer.length-90);
+ renderRemoteSnapshot=frame;
+ remoteSnapshotReceivedAt=performance.now();
 }
 function interpolateRemoteSnapshot(){
- if(isRaceHost()||!remoteFrameBuffer.length)return state?.snapshot||null;
- const target=Date.now()-remotePlaybackDelayMs;
- while(remoteFrameBuffer.length>3&&Number(remoteFrameBuffer[1].sentAt||0)<target-700)remoteFrameBuffer.shift();
- let a=remoteFrameBuffer[0],b=remoteFrameBuffer[remoteFrameBuffer.length-1];
- for(let i=0;i<remoteFrameBuffer.length-1;i++){
-  const f0=remoteFrameBuffer[i],f1=remoteFrameBuffer[i+1];
-  if(Number(f0.sentAt)<=target&&target<=Number(f1.sentAt)){a=f0;b=f1;break}
-  if(target<Number(remoteFrameBuffer[0].sentAt)){a=b=remoteFrameBuffer[0];break}
- }
- if(!a)return state?.snapshot||null;
- if(!b||a===b)return a;
- const span=Math.max(1,Number(b.sentAt)-Number(a.sentAt));
- const t=clamp((target-Number(a.sentAt))/span,0,1);
- const byId=new Map((a.balls||[]).map(x=>[String(x.ballId||x.id),x]));
- const balls=(b.balls||[]).map(nb=>{
-  const ob=byId.get(String(nb.ballId||nb.id));
-  if(!ob)return nb;
-  if(ob.done!==nb.done||ob.qualified!==nb.qualified)return t<.5?ob:nb;
-  return {...nb,x:Number(ob.x)+(Number(nb.x)-Number(ob.x))*t,y:Number(ob.y)+(Number(nb.y)-Number(ob.y))*t,vx:Number(nb.vx)||0,vy:Number(nb.vy)||0};
- });
- const lerp=(x,y)=>Number(x||0)+(Number(y||0)-Number(x||0))*t;
- return {...b,balls,cam:lerp(a.cam,b.cam),camX:lerp(a.camX,b.camX),camZoom:lerp(a.camZoom,b.camZoom),gate:lerp(a.gate,b.gate),rot:(b.rot||[]).map((v,i)=>lerp((a.rot||[])[i],v))};
+ if(isRaceHost())return state?.snapshot||null;
+ // 지연 재생/과거 프레임 보간을 하지 않고 가장 최근 공식 프레임 하나만 사용한다.
+ return renderRemoteSnapshot||remoteFrameBuffer[0]||state?.snapshot||null;
 }
+
 function packSnapshotBalls(list){
  return list.map(b=>[b.ballId,b.name,b.copy,b.ownerInitial||ownerMark(b.owner),+b.x.toFixed(1),+b.y.toFixed(1),b.done?1:0,b.qualified?1:0,b.rank||0,+b.vx.toFixed(2),+b.vy.toFixed(2),(b.waiting||performance.now()<(b.releaseAt||0))?1:0]);
 }
@@ -107,7 +97,7 @@ function restoreLobbyPreview(map,{clearParticipants=false}={}){
 function stopLocalRace({clearParticipants=false}={}){
  lifecycleEpoch++;
  if(sim)sim.paused=true;
- sim=null;localRunning=false;localRaceConfig=null;raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,snapshotSocket=null,snapshotSocketReady=false,snapshotSocketRetry=0,remoteFrameBuffer=[],renderRemoteSnapshot=null,remotePlaybackDelayMs=95;lastRace=-1;lastWinnerRace=-1;winnerPopupFirstSeenAt=0;manualCam=null;
+ sim=null;localRunning=false;localRaceConfig=null;raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,snapshotSocket=null,snapshotSocketReady=false,snapshotSocketRetry=0,remoteFrameBuffer=[],renderRemoteSnapshot=null,remotePlaybackDelayMs=0;lastRace=-1;lastWinnerRace=-1;winnerPopupFirstSeenAt=0;manualCam=null;
  snapshotInFlight=false;remoteFrameBuffer.length=0;renderRemoteSnapshot=null;
  if(state){state.status='lobby';state.finishOrder=[];state.winners=[];state.winnerDeclared=false;state.snapshot={balls:[],rot:[],gate:0,cam:0,camX:560,camZoom:.96};state.raceBalls=[];if(clearParticipants)state.participants=[]}
  // 새 판/맵 변경 즉시 이전 프레임을 지워 남은 공이 화면에 잔상으로 남지 않게 한다.
@@ -138,7 +128,10 @@ function connectSnapshotSocket(){
     if(packet.kind!=='snapshot'||!packet.snapshot)return;
     const snap=normalizeSnapshot(packet.snapshot),seq=Number(snap.seq||0);
     if(seq<lastAcceptedSnapshotSeq)return;
-    lastAcceptedSnapshotSeq=seq;remoteSnapshotReceivedAt=performance.now();queueRemoteSnapshot(snap);
+    const age=Math.max(0,syncNow()-Number(snap.sentAt||syncNow()));
+    // 네트워크 큐에 쌓인 과거 프레임은 상태에도 적용하지 않는다.
+    if(age>900&&renderRemoteSnapshot)return;
+    lastAcceptedSnapshotSeq=seq;queueRemoteSnapshot(snap);
     if(!state)state={};state.snapshot=snap;
     if(packet.status)state.status=packet.status;
     if(packet.raceId!=null)state.raceId=packet.raceId;
@@ -205,11 +198,14 @@ function scheduleSharedRace(incoming){
   stopLocalRace({clearParticipants:false});
   lastRace=rid;raceHostId=String(state.raceHostId||'');snapshotSeq=0;lastAcceptedSnapshotSeq=0;
   remoteFrameBuffer.length=0;renderRemoteSnapshot=null;
-  // 모든 화면이 같은 raceId + seed + 서버 startedAt으로 자기 브라우저에서 직접 물리를 계산한다.
-  // 관전자는 더 이상 시작자의 snapshot 전송속도/렉을 따라가지 않는다.
-  localRunning=true;
-  localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
-  startPhysics();
+  if(isRaceHost()){
+   localRunning=true;
+   localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
+   startPhysics();
+  }else{
+   // 다른 화면은 독립 물리를 돌리지 않고 시작한 화면의 프레임을 60fps 보간해 그대로 본다.
+   localRunning=false;localRaceConfig=null;sim=null;
+  }
  };
  const delay=Number(incoming.startedAt||0)-syncNow();
  if(delay>15)syncStartTimer=setTimeout(begin,Math.min(delay,500));else begin();
@@ -223,11 +219,11 @@ function connectRoomEvents(){
   try{
    const packet=JSON.parse(ev.data)||{};syncNoteClock(packet.serverNow);
    if(packet.kind==='snapshot'&&packet.snapshot){
-    // 진행 중에는 각 화면이 동일 seed/tick 물리를 직접 계산하므로 좌표 snapshot으로 덮어쓰지 않는다.
-    if(localRunning&&Number(packet.raceId)===Number(state?.raceId))return;
+    if(isRaceHost()&&Number(packet.raceId)===Number(state?.raceId))return;
     const snap=normalizeSnapshot(packet.snapshot),seq=Number(snap.seq||0);
-    if(seq>=lastAcceptedSnapshotSeq){
-     lastAcceptedSnapshotSeq=seq;remoteSnapshotReceivedAt=performance.now();queueRemoteSnapshot(snap);
+    const age=Math.max(0,syncNow()-Number(snap.sentAt||syncNow()));
+    if(seq>=lastAcceptedSnapshotSeq&&!(age>900&&renderRemoteSnapshot)){
+     lastAcceptedSnapshotSeq=seq;queueRemoteSnapshot(snap);
      if(!state)state={};state.snapshot=snap;
      if(packet.status)state.status=packet.status;
      if(packet.raceId!=null)state.raceId=packet.raceId;
@@ -244,8 +240,8 @@ function connectRoomEvents(){
    }
    const incoming=packet.state;if(!incoming)return;
    // 제어 이벤트는 snapshot을 의도적으로 제외하므로 현재 좌표 프레임을 유지해 화면 점프를 막는다.
-   if(!localRunning&&state?.snapshot&&!incoming.snapshot)incoming.snapshot=state.snapshot;
-   if(!localRunning&&incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
+   if(state?.snapshot&&!incoming.snapshot)incoming.snapshot=state.snapshot;
+   if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
    if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
    if(state?.raceBalls&&!incoming.raceBalls)incoming.raceBalls=state.raceBalls;
    const previousRace=state?.raceId,previousStatus=state?.status;
@@ -1068,7 +1064,7 @@ function stepOriginalBox2D(dt){
    const fin={...b,rank:b.rank};sim.finish.push(fin);
    // 서버 응답을 기다리지 않고 관리자 화면의 체크·순위를 실제 물리 결과와 즉시 동기화한다.
    if(state){state.finishOrder=sim.finish.map(q=>({ballId:q.ballId,name:q.name,copy:q.copy,rank:q.rank}));}
-   if(isRaceHost()&&winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
+   if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
    if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
    if(winningTargetRanks().includes(fin.rank)){
     // 두 맵 공통: 당첨 공을 1.5초 클로즈업한 뒤 숨기고, 메인 구도로 복귀하면서 Winner 팝업을 유지한다.
@@ -1288,7 +1284,7 @@ function resolveLastStandingWinner(now){
  sim.bottomCameraLocked=false;
  sim.cameraHoldUntil=0;
  manualCam=null;
- if(isRaceHost()&&winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
+ if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
    if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
  return b;
 }
@@ -1703,8 +1699,8 @@ function step(dt){
     sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
    }
    if(!preResolvedLastWinner){
-    if(isRaceHost()&&winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
-    if(isRaceHost()&&winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
+    if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
+    if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
    if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
    }
    if(!isWinner||preResolvedLastWinner){
@@ -1776,7 +1772,7 @@ function sendSnapshot(){
  if(!sim||resetInFlight||mutationBusy||String(state?.raceHostId||'')!==String(clientId))return;
  const activeSim=sim;
  const active=activeSim.balls.filter(b=>!b.done||String(b.ballId)===String(activeSim.focusBallId||''));
- const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),focusBallId:String(activeSim.focusBallId||''),focusRemainingMs:Math.max(0,Math.round(Number(activeSim.finishZoomUntil||0)-performance.now())),winnerResolved:!!activeSim.winnerResolved,sentAt:Date.now()}};
+ const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),focusBallId:String(activeSim.focusBallId||''),focusRemainingMs:Math.max(0,Math.round(Number(activeSim.finishZoomUntil||0)-performance.now())),winnerResolved:!!activeSim.winnerResolved,sentAt:syncNow()}};
  if(snapshotSocketReady&&snapshotSocket?.readyState===WebSocket.OPEN){
   // 브라우저 송신 큐가 밀리면 오래된 프레임을 더 쌓지 않는다.
   if(snapshotSocket.bufferedAmount<180000){try{snapshotSocket.send(JSON.stringify(payload));return}catch{}}
@@ -1800,8 +1796,9 @@ const themes={wheel:{bg:'#180b25',line:'#ffb6e7',glow:'#ff7bd5',peg:'#ffe675',bu
 function smoothRemoteSource(source,ts){
  if(role==='admin')return source;
  const dt=Math.min(34,Math.max(4,ts-(lastRemoteFrameTs||ts-16)));lastRemoteFrameTs=ts;
+ const frameAge=Math.max(0,syncNow()-Number((renderRemoteSnapshot||state?.snapshot)?.sentAt||syncNow()));
  const age=clamp(ts-(remoteSnapshotReceivedAt||ts),0,110);
- const ease=1-Math.exp(-dt/34),seen=new Set(),out=[];
+ const ease=frameAge>350?1:(1-Math.exp(-dt/26)),seen=new Set(),out=[];
  for(const b of source){
   const id=String(b.ballId||b.id||b.name),vx=Number(b.vx)||0,vy=Number(b.vy)||0;
   const predict=b.waiting?0:age*.94,targetX=Number(b.x)+vx*predict,targetY=Number(b.y)+vy*predict;
@@ -1875,17 +1872,17 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   const life=(performance.now()-sharedPointer.receivedAt)/650,px=Number(sharedPointer.x)*w,py=Number(sharedPointer.y)*h;
   x.save();x.globalAlpha=1-life;x.strokeStyle='#ffffff';x.lineWidth=3;x.beginPath();x.arc(px,py,12+life*34,0,Math.PI*2);x.stroke();x.restore();
  }
- renderRemoteSnapshot=null;let source=sim?.balls||((state?.snapshot)?.balls||[]),map=sim?.map||mapDef(state?.map||'wheel',state?.seed||1);
+ renderRemoteSnapshot=isRaceHost()?null:interpolateRemoteSnapshot();let source=isRaceHost()&&sim?sim.balls:((renderRemoteSnapshot||state?.snapshot)?.balls||[]),map=isRaceHost()&&sim?sim.map:mapDef(state?.map||'wheel',state?.seed||1);
  if((state?.status||'lobby')!=='running'&&!source.length)source=previewGridBalls();
  if(isRaceHost()&&sim||remoteFrameBuffer.length<2)source=smoothRemoteSource(source,ts);const denseMode=source.length>180;
  // v12.3: 당첨자가 확정되거나 레이스가 정지된 뒤에는 자동복구가 새 물리 월드를 만들지 않는다.
- if(sim&&localRunning&&!sim.paused&&!sim.winnerResolved&&!document.hidden&&ts-(sim.lastStepAt||ts)>12000){
+ if(isRaceHost()&&sim&&localRunning&&!sim.paused&&!sim.winnerResolved&&!document.hidden&&ts-(sim.lastStepAt||ts)>12000){
   // 경기 상태를 새로 만들면 체크/순위가 0으로 돌아가므로 절대 startPhysics()로 재시작하지 않는다.
   // 긴 프레임 뒤에는 누적 시간만 버리고 현재 월드에서 정상 진행을 이어간다.
   console.warn('긴 프레임 감지: 현재 물리 월드 유지');
   sim.last=ts;sim.acc=0;sim.lastStepAt=ts;
  }
- if(sim&&localRunning&&!sim.paused&&!document.hidden){
+ if(isRaceHost()&&sim&&localRunning&&!sim.paused&&!document.hidden){
   const physicsStep=8.333;
   if(!Number.isFinite(sim.sharedTick))sim.sharedTick=0;
   const elapsed=Math.max(0,syncNow()-Number(state?.startedAt||syncNow()));
@@ -1893,19 +1890,18 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   let missing=Math.max(0,targetTick-sim.sharedTick);
   // 모든 화면은 같은 서버 타임라인의 같은 tick 번호까지 계산한다.
   // 한 프레임에 과도한 계산을 몰아 브라우저가 멈추지 않도록 제한한다.
-  const behind=Math.max(0,missing);
-  const maxCatch=(sim.balls?.length||0)>800?(behind>24?8:4):(behind>24?16:8);
+  const maxCatch=(sim.balls?.length||0)>800?3:8;
   let loops=Math.min(missing,maxCatch);
   while(loops-->0){step(physicsStep);sim.sharedTick++}
   // 스냅샷은 시작한 화면만 복구용으로 저주기 저장. 다른 화면에는 진행 중 적용하지 않는다.
   const snapshotGap=sim.balls.length>800?150:sim.balls.length>500?115:sim.balls.length>250?75:40;
-  if(isRaceHost()&&ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
+  if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
  }
  const mh=map.worldH||H,renderBaseScale=Math.min((w-250)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
  const q=(r)=>ys.length?ys[Math.min(ys.length-1,Math.floor((ys.length-1)*r))]:mh-200;
  // 현재 목표 당첨 순번까지의 진행률. 예: 목표 55번, 현재 30번이면 약 55% 진행.
  let cameraNextRank=sim?.finish?.length?sim.finish.length+1:1,cameraTargetRank=0,cameraProgress=0;
- if(sim){
+ if(isRaceHost()&&sim){
   const cameraUpcoming=winningTargetRanks().filter(r=>r>=cameraNextRank).sort((a,b)=>a-b);
   cameraTargetRank=cameraUpcoming[0]||0;
   cameraProgress=cameraTargetRank?clamp((cameraNextRank-1)/Math.max(1,cameraTargetRank-1),0,1):0;
@@ -1922,12 +1918,12 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
    sim.bottomCameraLocked=true;sim.bottomCameraLockedAt=performance.now();sim.cameraHoldUntil=0;manualCam=null;
   }
  }
- const bottomCameraLocked=!!sim?.bottomCameraLocked;
+ const bottomCameraLocked=!!(role==='admin'&&sim?.bottomCameraLocked);
  const liveSnapshot=(renderRemoteSnapshot||state?.snapshot)||{};
- const syncedFocusId=String(sim?.focusBallId||liveSnapshot.focusBallId||'');
+ const syncedFocusId=role==='admin'?String(sim?.focusBallId||''):String(liveSnapshot.focusBallId||'');
  const focusWinnerBall=syncedFocusId?active.find(b=>String(b.ballId)===syncedFocusId):null;
  const greedCameraCandidate=map.type==='greed'?pickGreedCameraCandidate(active,map):null;
- const remoteFocusActive=!isRaceHost()&&!!focusWinnerBall&&(Number(liveSnapshot.focusRemainingMs||0)>0||!!liveSnapshot.winnerResolved)&&!focusWinnerBall.done;
+ const remoteFocusActive=role!=='admin'&&!!focusWinnerBall&&(Number(liveSnapshot.focusRemainingMs||0)>0||!!liveSnapshot.winnerResolved)&&!focusWinnerBall.done;
  const winnerCinematic=!!(focusWinnerBall&&(role==='admin'?(performance.now()<sim.finishZoomUntil||(sim.winnerResolved&&focusWinnerBall.qualified&&!focusWinnerBall.done)):remoteFocusActive));
  const stops=map.cameraStops||[];let bestStop=null,bestScore=-1;
  const nowCam=performance.now();
