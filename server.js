@@ -64,6 +64,7 @@ function newRoom(code) {
     seed: 1,
     shuffleNonce: 0,
     winnerDeclared: false,
+    winnerPopupAt: 0,
     startedAt: 0,
     duration: 0,
     updatedAt: now(),
@@ -86,6 +87,7 @@ function backToLobby(room) {
   room.finishOrder = [];
   room.winners = [];
   room.winnerDeclared = false;
+  room.winnerPopupAt = 0;
   room.snapshot = emptySnapshot();
   room.startedAt = 0;
   room.duration = 0;
@@ -309,6 +311,7 @@ function handleAction(res, data) {
           if (winners.length === wanted.length) {
             room.winners = winners;
             room.winnerDeclared = true;
+            room.winnerPopupAt = now() + 700;
           }
         }
         touch(room);
@@ -333,6 +336,7 @@ function handleAction(res, data) {
             else if (room.winMode === 'last') room.winners = [room.finishOrder[room.finishOrder.length - 1]];
             else room.winners = room.winningRanks.map((rank) => room.finishOrder[rank - 1]).filter(Boolean);
             room.winnerDeclared = true;
+            room.winnerPopupAt = now() + 700;
           }
         }
         touch(room);

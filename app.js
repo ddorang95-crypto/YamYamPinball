@@ -2448,53 +2448,48 @@ function renderWinner(){
   else if(state.winMode==='number'){const ranks=state.winningRanks||[],max=Math.max(0,...ranks);if(f.length>=max)winners=ranks.filter(r=>r<=f.length).map(r=>f[r-1])}
  }
  if(!winners.length){winnerPopupFirstSeenAt=0;card.classList.remove('show');return}
- const now=performance.now();if(!winnerPopupFirstSeenAt)winnerPopupFirstSeenAt=now;
- // 위너 팝업은 당첨 공이 결승 직선 낙하를 끝낸 뒤에만 표시한다.
- // 관리자 로컬 물리에서는 실제 당첨 공 done 시점을 사용하고, 원격 화면은 스냅샷 done 또는 안전 지연을 사용한다.
- let dropFinished=true;
- if(sim?.winnerResolved){
-  const focused=sim.balls?.find(b=>String(b.ballId)===String(sim.focusBallId));
-  const previewEnd=Math.max(Number(sim.winnerPopupNotBefore||0),Number(sim.finishZoomUntil||0));
-  // 당첨공은 약 1.5초만 확대 추적한다. 이후 공이 통로 아래로 계속 움직이더라도
-  // 카메라는 더 따라가지 않고 메인 구도로 복귀한 뒤 Winner 팝업을 표시한다.
-  if(!sim.winnerPopupReady&&now>=previewEnd){
+
+ const nowPerf=performance.now();
+ if(!winnerPopupFirstSeenAt)winnerPopupFirstSeenAt=nowPerf;
+
+ // 서버가 당첨을 확정한 뒤 정한 하나의 공통 popupAt을 모든 화면이 그대로 사용한다.
+ // 시작한 화면의 로컬 sim/winnerPopupReady 여부로 별도 지연시키지 않는다.
+ const popupAt=Number(state.winnerPopupAt||0);
+ let ready=false;
+ if(popupAt>0){
+   ready=syncNow()>=popupAt;
+ }else{
+   // 구버전 서버/배포 전환 순간 fallback: 모든 화면 동일하게 짧은 700ms 지연.
+   ready=nowPerf-winnerPopupFirstSeenAt>=700;
+ }
+ if(!ready){card.classList.remove('show');return}
+
+ // host 카메라/클로즈업이 아직 남아 있으면 팝업과 충돌하지 않게 즉시 메인 복귀만 수행.
+ if(isRaceHost()&&sim?.winnerResolved){
    sim.winnerPopupReady=true;
-   sim.winnerPopupReadyAt=now;
+   sim.winnerPopupReadyAt=nowPerf;
    sim.firstWinnerPreview=false;
-   if(focused){focused.finishVisualUntil=Math.max(Number(focused.finishVisualUntil||0),now+4200)}
-   sim.focusBallId='';sim.finishZoomStart=0;sim.finishZoomUntil=0;
+   sim.focusBallId='';
+   sim.finishZoomStart=0;
+   sim.finishZoomUntil=0;
    const activeMap=sim.map||mapDef(state?.map||'wheel',state?.seed||1);
    sim.winnerReturnY=Math.max(0,(activeMap.finalZone?.top??activeMap.finishY-700)-260);
-   sim.winnerReturnUntil=now+1500;sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
-  }
-  // 공 자체는 뒤에서 계속 물리적으로 진행할 수 있지만, 팝업 타이밍은 짧은 클로즈업 종료 시점 기준이다.
-  dropFinished=!!sim.winnerPopupReady&&now>=Number(sim.winnerPopupReadyAt||0);
+   sim.winnerReturnUntil=nowPerf+900;
+   sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
  }
- else{
-  const snap=state.snapshot?.balls||[];
-  const winnerIds=new Set(winners.map(w=>String(w.ballId||'')));
-  const matched=snap.filter(b=>winnerIds.has(String(b.ballId||'')));
-  const popupY=Number(mapDef(state?.map||'wheel',state?.seed||1)?.popupY??Infinity);
-  if(matched.length)dropFinished=(now-winnerPopupFirstSeenAt>=800)&&matched.some(b=>b.done||Number(b.y)>=popupY);
-  else dropFinished=now-winnerPopupFirstSeenAt>=800;
- }
- if(!dropFinished){card.classList.remove('show');return}
+
  const winnerMarkup=winners.map(w=>`<span>${esc(w.name)}</span>`).join('');
- // 매 프레임 innerHTML 재작성과 강제 레이아웃(offsetWidth)을 피해서 팝업 순간 렉을 줄인다.
  if(names.dataset.markup!==winnerMarkup){names.innerHTML=winnerMarkup;names.dataset.markup=winnerMarkup}
  card.classList.add('show');card.dataset.effectProfile='global';
  if(lastWinnerRace!==state.raceId){
   lastWinnerRace=state.raceId;
-  // 기존 애니메이션 상태를 확실히 비운 다음 두 프레임 뒤 재생해
-  // 플래시·반짝임·왕관 효과가 매 경기 빠짐없이 다시 시작되게 한다.
   card.classList.remove('burst','winner-pop');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
-   if(lastWinnerRace===state?.raceId){
-    card.classList.add('winner-pop');
-   }
+   if(lastWinnerRace===state?.raceId)card.classList.add('winner-pop');
   }));
  }
 }
+
 function advanceFastForwardClock(extraMs){
  if(!sim||!canvasDragFastForward||!Number.isFinite(extraMs)||extraMs<=0)return;
  // 물리 스텝만 늘리는 것이 아니라 경기 내부의 시간 기준도 같은 만큼 앞당긴다.
