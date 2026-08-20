@@ -1,0 +1,23 @@
+관전자 시작 후 아무것도 안 보이는 문제 실제 원인 수정
+
+원인:
+- 공통 시작시각이 되면 scheduleSharedRace()가 stopLocalRace()를 호출.
+- stopLocalRace() 안에서 snapshotSocket을 close하고 null로 만듦.
+- 시작자는 그 뒤 직접 물리를 돌리므로 정상적으로 보임.
+- 관전자는 물리를 안 돌리고 WebSocket 공식 프레임만 봐야 하는데,
+  시작 순간 자기 snapshot WebSocket이 닫힌 뒤 다시 연결되지 않았음.
+→ 관전자에게 공/카메라 프레임이 안 들어와 시작 후 화면이 멈춤.
+
+수정:
+1. 공통 시작 순간 stopLocalRace() 직후 connectSnapshotSocket() 즉시 재연결.
+2. WebSocket generation 번호 추가:
+   - 이전 socket의 늦은 onclose가 새 socket을 또 끊거나 중복 연결하는 문제 방지.
+3. 재연결 간격 단축.
+4. 관전자 프레임 watchdog 추가:
+   - 경기 중 1.2초 이상 새 공식 프레임이 안 오면 자동으로 WebSocket 재연결.
+5. WebSocket이 잠깐 불안정할 때도 관전자는 /api/state snapshot을 120ms 간격 fallback으로 받아 화면을 계속 갱신.
+6. 관전자는 독립물리 사용 안 함.
+7. 시작자 공 위치 + 카메라 위치 + 줌 + 회전바 + 당첨 연출 snapshot을 그대로 표시.
+
+기존 호스트 권위/latest-frame-only 서버 구조 유지.
+app.js 수정이 핵심이며 server.js도 함께 포함.

@@ -109,13 +109,20 @@ function bindSharedInteractions(){
 }
 function wsUrl(){return (location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/snapshot-stream?room='+encodeURIComponent(room)}
 function isRaceHost(){return !!state&&String(state.raceHostId||'')===String(clientId)}
+let snapshotSocketGeneration=0;
 function connectSnapshotSocket(){
- try{snapshotSocket?.close()}catch{}
+ const gen=++snapshotSocketGeneration;
+ const old=snapshotSocket;snapshotSocket=null;
+ try{if(old&&old.readyState<2){old.onclose=null;old.onerror=null;old.close()}}catch{}
  snapshotSocketReady=false;
  try{
   const ws=new WebSocket(wsUrl());snapshotSocket=ws;
   ws.binaryType='arraybuffer';
-  ws.onopen=()=>{snapshotSocketReady=true;snapshotSocketRetry=0};
+  ws.onopen=()=>{
+   if(gen!==snapshotSocketGeneration){try{ws.close()}catch{};return}
+   snapshotSocketReady=true;snapshotSocketRetry=0;
+   // WebSocket 서버가 연결 직후 현재 room.snapshot도 보내므로 바로 공식 화면에 붙는다.
+  };
   ws.onmessage=(ev)=>{
    try{
     const packet=JSON.parse(typeof ev.data==='string'?ev.data:new TextDecoder().decode(ev.data));
@@ -129,8 +136,12 @@ function connectSnapshotSocket(){
     if(packet.raceId!=null)state.raceId=packet.raceId;
    }catch(e){console.warn('고속 프레임 처리 실패',e)}
   };
-  ws.onclose=()=>{snapshotSocketReady=false;setTimeout(connectSnapshotSocket,Math.min(5000,500+snapshotSocketRetry++*400))};
-  ws.onerror=()=>{try{ws.close()}catch{}};
+  ws.onclose=()=>{
+   if(gen!==snapshotSocketGeneration)return;
+   snapshotSocketReady=false;
+   setTimeout(()=>{if(gen===snapshotSocketGeneration)connectSnapshotSocket()},Math.min(3000,250+snapshotSocketRetry++*250));
+  };
+  ws.onerror=()=>{if(gen===snapshotSocketGeneration)try{ws.close()}catch{}};
  }catch{setTimeout(connectSnapshotSocket,1200)}
 }
 let syncClockOffset=0,syncStartTimer=0,syncStartRaceId=0;
@@ -187,9 +198,12 @@ function scheduleSharedRace(incoming){
   // 서버 공통시각 + 시작자 로컬 최소 5초 게이트를 둘 다 통과해야만 시작한다.
   if(remain>20){syncStartTimer=setTimeout(begin,Math.max(20,Math.min(remain,500)));return}
   stopStartCountdown();
+  // 공통 시작 순간 로컬 경기 상태는 초기화하되, 관전자 프레임 WebSocket은 즉시 다시 연결한다.
+  // 기존 stopLocalRace()가 snapshotSocket을 닫기 때문에 재연결하지 않으면 관전자는 시작 후 첫 화면에 멈춘다.
   stopLocalRace({clearParticipants:false});
   lastRace=rid;raceHostId=String(state.raceHostId||'');snapshotSeq=0;lastAcceptedSnapshotSeq=0;
   remoteFrameBuffer.length=0;renderRemoteSnapshot=null;
+  connectSnapshotSocket();
   if(isRaceHost()){
    localRunning=true;
    localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
@@ -258,11 +272,23 @@ function connectRoomEvents(){
  };
  eventSource.onerror=()=>{if($('conn'))$('conn').textContent='실시간 재연결 중'};
 }
+
+let viewerFrameWatchdog=0;
+function ensureViewerFrameStream(){
+ if(isRaceHost()||state?.status!=='running')return;
+ const stale=performance.now()-(remoteSnapshotReceivedAt||0);
+ if((!snapshotSocket||snapshotSocket.readyState!==WebSocket.OPEN||stale>1200)&&performance.now()-viewerFrameWatchdog>1000){
+  viewerFrameWatchdog=performance.now();
+  connectSnapshotSocket();
+ }
+}
+setInterval(ensureViewerFrameStream,700);
+
 async function poll(){
  // 관리자 로컬 물리가 권위 소스인 동안에는 자기 스냅샷을 다시 내려받아 파싱하지 않는다.
  // 네트워크/JSON 작업이 메인 스레드를 막아 공이 중간에 멈추는 현상을 방지한다.
  if(localRunning&&sim&&eventSource&&eventSource.readyState===1){setTimeout(poll,900);return}
- if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;syncNoteClock(j.serverNow);if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&Number(state.raceId)!==Number(lastRace)){scheduleSharedRace(state)}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?220:320)}}
+ if(polling||mutationBusy){setTimeout(poll,140);return}polling=true;try{const r=await fetch('/api/state?room='+room,{cache:'no-store'});if(!r.ok)throw Error('상태 요청 실패');const j=await r.json(),incoming=j.state;syncNoteClock(j.serverNow);if(!incoming)throw Error('상태 데이터 없음');if(performance.now()<serverStateSuppressedUntil&&!localRunning){incoming.status='lobby';incoming.map=selectedMapLock||state?.map||incoming.map;incoming.finishOrder=[];incoming.winners=[];incoming.raceBalls=[];incoming.snapshot={balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}}if(role==='admin'&&!unifiedMode&&selectedMapLock&&!localRunning)incoming.map=selectedMapLock;if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state?.snapshot||incoming.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;state=incoming;connectionFailures=0;if($('conn'))$('conn').textContent='연결됨';ui();if(performance.now()>=serverStateSuppressedUntil&&!localRunning&&state.status==='running'&&!state.winnerDeclared&&!(state.winners||[]).length&&Number(state.raceId)!==Number(lastRace)){scheduleSharedRace(state)}}catch(e){connectionFailures++;if($('conn'))$('conn').textContent=connectionFailures>=4?'연결 재시도 중':'연결됨'}finally{polling=false;setTimeout(poll,state?.status==='running'?(isRaceHost()?220:120):320)}}
 function parseBulk(t){return t.split(/[\n,]+/).map(s=>s.trim()).filter(Boolean).map(s=>{const m=s.match(/^(.*?)(?:\s*[xX*×]\s*(\d+))?$/);return{name:(m?.[1]||'').trim(),count:Math.max(1,Number(m?.[2]||1)|0)}}).filter(x=>x.name)}
 function bindAdmin(){
  if($('soloBtn'))$('soloBtn').onclick=()=>api('setMode',{mode:'solo'});if($('groupBtn'))$('groupBtn').onclick=()=>api('setMode',{mode:'group'});if($('saveTitle')&&$('titleInput'))$('saveTitle').onclick=()=>api('setTitle',{title:$('titleInput').value});
