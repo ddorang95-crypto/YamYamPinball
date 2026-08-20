@@ -131,6 +131,7 @@ function connectSnapshotSocket(){
     if(seq<lastAcceptedSnapshotSeq)return;
     // 최신 seq는 무조건 적용. 오래된 프레임은 서버가 이미 latest-only로 폐기한다.
     lastAcceptedSnapshotSeq=seq;queueRemoteSnapshot(snap);
+    renderRemoteSnapshot=snap;remoteSnapshotReceivedAt=performance.now();
     if(!state)state={};state.snapshot=snap;
     if(packet.status)state.status=packet.status;
     if(packet.raceId!=null)state.raceId=packet.raceId;
@@ -186,6 +187,24 @@ function applyCurrentSnapshotOnce(snap,attempt=0){
 function scheduleSharedRace(incoming){
  if(!incoming||incoming.status!=='running')return;
  const rid=Number(incoming.raceId)||0;
+
+ // 관전자는 물리를 시작하거나 stopLocalRace()를 호출하지 않는다.
+ // 연결/화면 상태를 그대로 유지한 채 시작자의 공식 snapshot을 즉시 받아 그린다.
+ if(String(incoming.raceHostId||'')!==String(clientId)){
+   raceHostId=String(incoming.raceHostId||'');
+   lastRace=rid;
+   localRunning=false;
+   localRaceConfig=null;
+   sim=null;
+   remoteFrameBuffer.length=0;
+   renderRemoteSnapshot=null;
+   lastAcceptedSnapshotSeq=0;
+   // 이미 열린 WebSocket은 절대 끊지 않는다. 닫혀 있을 때만 복구.
+   if(!snapshotSocket||snapshotSocket.readyState>1)connectSnapshotSocket();
+   return;
+ }
+
+ // 아래는 시작 버튼을 누른 사람(호스트)만 실행.
  if(localRunning&&Number(lastRace)===rid)return;
  if(syncStartRaceId===rid&&syncStartTimer)return;
  cancelSyncStart();syncStartRaceId=rid;
@@ -193,25 +212,26 @@ function scheduleSharedRace(incoming){
   syncStartTimer=0;
   if(!state||state.status!=='running'||Number(state.raceId)!==rid)return;
   const serverRemain=Number(state.startedAt||incoming.startedAt||0)-syncNow();
-  const localRemain=isRaceHost()?localStartHardNotBefore-performance.now():0;
+  const localRemain=localStartHardNotBefore-performance.now();
   const remain=Math.max(serverRemain,localRemain);
-  // 서버 공통시각 + 시작자 로컬 최소 5초 게이트를 둘 다 통과해야만 시작한다.
   if(remain>20){syncStartTimer=setTimeout(begin,Math.max(20,Math.min(remain,500)));return}
   stopStartCountdown();
-  // 공통 시작 순간 로컬 경기 상태는 초기화하되, 관전자 프레임 WebSocket은 즉시 다시 연결한다.
-  // 기존 stopLocalRace()가 snapshotSocket을 닫기 때문에 재연결하지 않으면 관전자는 시작 후 첫 화면에 멈춘다.
+
+  // 호스트만 기존 로컬 물리를 정리하고 새 레이스 시작.
+  // 관전자 연결은 이 경로를 타지 않으므로 절대 끊기지 않는다.
+  const keepRaceHost=String(state.raceHostId||incoming.raceHostId||clientId);
+  const keepState={...state};
   stopLocalRace({clearParticipants:false});
-  lastRace=rid;raceHostId=String(state.raceHostId||'');snapshotSeq=0;lastAcceptedSnapshotSeq=0;
+  state={...keepState,status:'running',raceHostId:keepRaceHost,raceId:rid,
+    startedAt:Number(incoming.startedAt||keepState.startedAt||0),
+    snapshot:{balls:[],rot:[],gate:0,cam:0,camX:W/2,camZoom:.96}};
+  lastRace=rid;raceHostId=keepRaceHost;snapshotSeq=0;lastAcceptedSnapshotSeq=0;
   remoteFrameBuffer.length=0;renderRemoteSnapshot=null;
   connectSnapshotSocket();
-  if(isRaceHost()){
-   localRunning=true;
-   localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
-   startPhysics();
-  }else{
-   // 다른 화면은 독립 물리를 돌리지 않고 시작한 화면의 프레임을 60fps 보간해 그대로 본다.
-   localRunning=false;localRaceConfig=null;sim=null;
-  }
+
+  localRunning=true;
+  localRaceConfig={map:state.map,raceId:state.raceId,seed:state.seed,winMode:state.winMode,ranks:state.winningRanks||[1]};
+  startPhysics();
  };
  const delay=Number(incoming.startedAt||0)-syncNow();
  if(delay>15)syncStartTimer=setTimeout(begin,Math.min(delay,500));else begin();
@@ -229,6 +249,7 @@ function connectRoomEvents(){
     const snap=normalizeSnapshot(packet.snapshot),seq=Number(snap.seq||0);
     if(seq>=lastAcceptedSnapshotSeq){
      lastAcceptedSnapshotSeq=seq;queueRemoteSnapshot(snap);
+     renderRemoteSnapshot=snap;remoteSnapshotReceivedAt=performance.now();
      if(!state)state={};state.snapshot=snap;
      if(packet.status)state.status=packet.status;
      if(packet.raceId!=null)state.raceId=packet.raceId;
@@ -246,7 +267,14 @@ function connectRoomEvents(){
    const incoming=packet.state;if(!incoming)return;
    // 제어 이벤트는 snapshot을 의도적으로 제외하므로 현재 좌표 프레임을 유지해 화면 점프를 막는다.
    if(state?.snapshot&&!incoming.snapshot)incoming.snapshot=state.snapshot;
-   if(incoming?.snapshot){incoming.snapshot=normalizeSnapshot(incoming.snapshot);queueRemoteSnapshot(incoming.snapshot);}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
+   if(incoming?.snapshot){
+ incoming.snapshot=normalizeSnapshot(incoming.snapshot);
+ queueRemoteSnapshot(incoming.snapshot);
+ if(!isRaceHost()&&incoming.status==='running'&&Array.isArray(incoming.snapshot.balls)&&incoming.snapshot.balls.length){
+   renderRemoteSnapshot=incoming.snapshot;
+   remoteSnapshotReceivedAt=performance.now();
+ }
+}const incomingSeq=Number(incoming?.snapshot?.seq||incoming?.snapshotSeq||0),currentSeq=Number(state?.snapshot?.seq||lastAcceptedSnapshotSeq||0);
    if(incomingSeq&&incomingSeq<currentSeq)incoming.snapshot=state.snapshot;else if(incomingSeq)lastAcceptedSnapshotSeq=incomingSeq;
    if(state?.raceBalls&&!incoming.raceBalls)incoming.raceBalls=state.raceBalls;
    const previousRace=state?.raceId,previousStatus=state?.status;
@@ -277,10 +305,12 @@ let viewerFrameWatchdog=0;
 function ensureViewerFrameStream(){
  if(isRaceHost()||state?.status!=='running')return;
  const stale=performance.now()-(remoteSnapshotReceivedAt||0);
- if((!snapshotSocket||snapshotSocket.readyState!==WebSocket.OPEN||stale>1200)&&performance.now()-viewerFrameWatchdog>1000){
+ if((!snapshotSocket||snapshotSocket.readyState!==WebSocket.OPEN)&&performance.now()-viewerFrameWatchdog>700){
   viewerFrameWatchdog=performance.now();
   connectSnapshotSocket();
  }
+ // 소켓은 열려 있는데 프레임이 안 오면 연결을 끊지 말고 HTTP 상태를 즉시 한 번 당겨온다.
+ if(stale>700&&!polling)poll();
 }
 setInterval(ensureViewerFrameStream,700);
 

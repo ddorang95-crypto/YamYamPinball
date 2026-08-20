@@ -1,0 +1,19 @@
+관전자 공 낙하/카메라 중계 확실 복구
+
+실제 핵심 문제:
+- 관전자도 scheduleSharedRace()의 공통 시작 경로를 타면서 stopLocalRace()가 실행됨.
+- stopLocalRace()는 관전자의 snapshot 연결/렌더 상태/레이스 상태까지 초기화함.
+- 관전자는 물리를 직접 돌리지 않으므로 이 초기화 이후 화면을 다시 살릴 수 없는 경우가 생김.
+
+수정:
+1. 관전자는 scheduleSharedRace()에서 절대 stopLocalRace()를 호출하지 않음.
+2. 관전자는 기존 WebSocket 연결을 계속 유지하면서 호스트 snapshot만 표시.
+3. 공통 시작 타이머/물리 초기화는 시작 버튼을 누른 호스트에게만 적용.
+4. WebSocket snapshot 수신 즉시 renderRemoteSnapshot에 바로 적용.
+5. SSE snapshot도 즉시 renderRemoteSnapshot에 적용.
+6. /api/state polling snapshot도 관전자 화면에 즉시 적용하는 3중 fallback.
+7. 관전자 소켓이 열려 있는데 잠깐 프레임이 없다고 소켓을 끊지 않음.
+   대신 HTTP 상태를 즉시 당겨와 화면을 보완.
+8. 시작자의 공 위치, 카메라 이동, 줌, 회전바, 당첨 직전 연출을 그대로 중계.
+
+app.js가 핵심 수정. server.js는 직전 최신프레임 서버 그대로 포함.
