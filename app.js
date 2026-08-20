@@ -480,7 +480,7 @@ function latchLocalWinner(ball){
  if(!localWinnerLatch||Number(localWinnerLatch.raceId)!==Number(state.raceId)){
    localWinnerLatch={
      raceId:Number(state.raceId)||0,
-     popupAtPerf:performance.now()+700,
+     popupAtPerf:performance.now()+250,
      winner:{ballId:ball.ballId,name:ball.name,copy:ball.copy,owner:ball.owner,ownerInitial:ball.ownerInitial,rank}
    };
  }
@@ -1818,7 +1818,6 @@ function step(dt){
    }
    if(!preResolvedLastWinner){
     if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
-    if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
    if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
    }
    if(!isWinner||preResolvedLastWinner){
@@ -2615,12 +2614,25 @@ function renderRank(force=false){
 function renderWinner(){
  const card=$('winnerCard'),names=$('winnerNames');if(!card||!names||!state)return;
 
- const hostLatch=(isRaceHost()&&localWinnerLatch&&Number(localWinnerLatch.raceId)===Number(state.raceId))?localWinnerLatch:null;
- let winners=state.winners||[];
+ // 시작한 화면은 서버보다 먼저 실제 물리 결과를 알고 있으므로 로컬 결과를 최우선 사용한다.
+ let hostLatch=(isRaceHost()&&localWinnerLatch&&Number(localWinnerLatch.raceId)===Number(state.raceId))?localWinnerLatch:null;
 
- // 시작한 화면은 실제 로컬 물리에서 당첨 순번이 확정된 순간 이미 정답을 알고 있다.
- // 자기 서버 broadcast가 다시 돌아올 때까지 기다리지 않고 같은 700ms 연출 지연만 적용한다.
- if(!winners.length&&hostLatch)winners=[hostLatch.winner];
+ // 혹시 latch 호출이 한 프레임 늦더라도 sim.finish에서 당첨 순번이 이미 확정됐으면 즉시 latch를 만든다.
+ if(isRaceHost()&&!hostLatch&&sim?.finish?.length){
+   const targets=winningTargetRanks();
+   const localWinner=sim.finish.find(q=>targets.includes(Number(q.rank)||0));
+   if(localWinner){
+     localWinnerLatch={
+       raceId:Number(state.raceId)||0,
+       popupAtPerf:performance.now()+120,
+       winner:{ballId:localWinner.ballId,name:localWinner.name,copy:localWinner.copy,owner:localWinner.owner,ownerInitial:localWinner.ownerInitial,rank:Number(localWinner.rank)||0}
+     };
+     hostLatch=localWinnerLatch;
+   }
+ }
+
+ let winners=state.winners||[];
+ if(hostLatch)winners=[hostLatch.winner];
 
  if(!winners.length&&state.status==='running'){
   const f=state.finishOrder||[];
@@ -2634,22 +2646,19 @@ function renderWinner(){
 
  let ready=false;
  if(hostLatch){
+   // 호스트는 로컬 결승 판정 직후 약 0.25초 내 팝업.
+   // 관전자 서버 왕복보다 늦어지는 일이 없도록 서버 popupAt을 기다리지 않는다.
    ready=nowPerf>=Number(hostLatch.popupAtPerf||0);
  }else{
+   // 관전자는 서버가 확정한 공통 popupAt 사용.
    const popupAt=Number(state.winnerPopupAt||0);
    if(popupAt>0)ready=syncNow()>=popupAt;
    else ready=nowPerf-winnerPopupFirstSeenAt>=700;
  }
  if(!ready){card.classList.remove('show');return}
 
- if(isRaceHost()&&sim?.winnerResolved){
-   sim.winnerPopupReady=true;sim.winnerPopupReadyAt=nowPerf;sim.firstWinnerPreview=false;
-   sim.focusBallId='';sim.finishZoomStart=0;sim.finishZoomUntil=0;
-   const activeMap=sim.map||mapDef(state?.map||'wheel',state?.seed||1);
-   sim.winnerReturnY=Math.max(0,(activeMap.finalZone?.top??activeMap.finishY-700)-260);
-   sim.winnerReturnUntil=nowPerf+900;sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
- }
-
+ // 팝업이 뜬 뒤에도 마지막 당첨공 식별 연출은 별도로 유지한다.
+ // 팝업 때문에 focusBallId/finishZoom을 강제로 끄지 않는다.
  const winnerMarkup=winners.map(w=>`<span>${esc(w.name)}</span>`).join('');
  if(names.dataset.markup!==winnerMarkup){names.innerHTML=winnerMarkup;names.dataset.markup=winnerMarkup}
  card.classList.add('show');card.dataset.effectProfile='global';
@@ -2661,7 +2670,6 @@ function renderWinner(){
   }));
  }
 }
-
 function advanceFastForwardClock(extraMs){
  if(!sim||!canvasDragFastForward||!Number.isFinite(extraMs)||extraMs<=0)return;
  // 물리 스텝만 늘리는 것이 아니라 경기 내부의 시간 기준도 같은 만큼 앞당긴다.
