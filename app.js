@@ -762,8 +762,69 @@ function greedNeonBoundsAtY(y){
  // 공 반지름(.25)과 고속 충돌 오차를 고려해 네온 선보다 충분히 안쪽을 사용한다.
  return{left:left+.34,right:right-.34};
 }
+
+function originalPolylineXAtY(points,y){
+ if(!Array.isArray(points)||points.length<2)return null;
+ const hits=[];
+ for(let i=0;i<points.length-1;i++){
+  const a=points[i],b=points[i+1],y1=Number(a[1]),y2=Number(b[1]);
+  if(!Number.isFinite(y1)||!Number.isFinite(y2))continue;
+  if(y<Math.min(y1,y2)-1e-6||y>Math.max(y1,y2)+1e-6)continue;
+  if(Math.abs(y2-y1)<1e-8){hits.push(Number(a[0]),Number(b[0]));continue}
+  const t=(y-y1)/(y2-y1);
+  hits.push(Number(a[0])+(Number(b[0])-Number(a[0]))*t);
+ }
+ return hits.filter(Number.isFinite);
+}
+function originalWheelSafeBoundsAtY(y){
+ const st=ORIGINAL_WHEEL_STAGE;
+ const polys=(st.entities||[]).filter(e=>e?.type==='static'&&e?.shape?.type==='polyline');
+ // 원본 wheel의 첫 두 polyline이 화면에 보이는 좌/우 외곽선이다.
+ if(polys.length<2)return null;
+ const L=originalPolylineXAtY(polys[0].shape.points,Number(y));
+ const R=originalPolylineXAtY(polys[1].shape.points,Number(y));
+ if(!L?.length||!R?.length)return null;
+ const left=Math.min(...L),right=Math.max(...R);
+ if(!Number.isFinite(left)||!Number.isFinite(right)||right-left<.7)return null;
+ return {left,right};
+}
+function containOriginalBallInsideVisibleMap(body,B,pos,vel){
+ if(!body||!pos||!sim)return pos;
+ const type=String(state?.map||sim?.map?.type||'');
+
+ // 욕망 맵은 실제 네온 외곽선 + 중앙 통로 전용 경계를 사용.
+ if(type==='greed')return containGreedBallInsideNeon(body,B,pos,vel);
+
+ // Wheel은 화면에 그려진 실제 좌/우 polyline 사이에만 공이 존재하도록 한다.
+ if(type!=='wheel')return pos;
+ const bd=originalWheelSafeBoundsAtY(pos.y);
+ if(!bd)return pos;
+
+ // 공 반지름까지 고려해서 선 자체에 걸치지 않게 아주 조금 안쪽을 사용.
+ const radius=.29,inner=.035;
+ const minX=bd.left+radius+inner,maxX=bd.right-radius-inner;
+ if(maxX<=minX)return pos;
+
+ let nx=pos.x,changed=false,hitLeft=false,hitRight=false;
+ if(nx<minX){nx=minX;changed=true;hitLeft=true}
+ else if(nx>maxX){nx=maxX;changed=true;hitRight=true}
+ if(!changed)return pos;
+
+ try{
+  body.SetTransform(new B.b2Vec2(nx,pos.y),body.GetAngle());
+  const v=vel||body.GetLinearVelocity();
+  // 밖으로 향하던 횡속도만 안쪽으로 약하게 반사하고 아래 낙하는 그대로 살린다.
+  let vx=Number(v?.x)||0,vy=Number(v?.y)||0;
+  if(hitLeft&&vx<0)vx=Math.abs(vx)*.18;
+  if(hitRight&&vx>0)vx=-Math.abs(vx)*.18;
+  vy=Math.max(vy,.15);
+  body.SetLinearVelocity(new B.b2Vec2(vx,vy));
+  return body.GetPosition();
+ }catch(_){return pos}
+}
+
 function containGreedBallInsideNeon(body,B,pos,vel){
- if(!canvasDragFastForward||!sim?.map?.rules?.requireCenterChute||!body||!pos)return pos;
+ if(!sim?.map?.rules?.requireCenterChute||!body||!pos)return pos;
  const bounds=greedNeonBoundsAtY(pos.y);if(!bounds)return pos;
  let x=pos.x,y=pos.y,changed=false;
  if(x<bounds.left){x=bounds.left;changed=true}
@@ -895,6 +956,10 @@ function stepOriginalBox2D(dt){
     pos=containGreedBallInsideNeon(body,B,pos,body.GetLinearVelocity());
    }catch(_){ }
   }
+  // 모든 속도/일반 진행에서 최종 안전경계를 적용한다.
+  // 물리 충돌이 한 프레임을 건너뛰어도 공이 보이는 맵 선 바깥으로 절대 빠져나가지 않게 하고,
+  // 하단에서는 원본 외곽선이 자연스럽게 좁아지므로 반드시 실제 통로 입구 쪽으로 모인다.
+  try{pos=containOriginalBallInsideVisibleMap(body,B,pos,body.GetLinearVelocity())}catch(_){}
   if(inGreedCenterChute){
    // 원본 욕망의 항아리처럼 중앙 통로 진입 후에는 인위적인 속도 보정 없이 Box2D 중력으로 자연 낙하한다.
    // Impact 및 5초 정체 해제 impulse만 제외해 통로 안에서 위로 되튀는 현상을 막는다.
