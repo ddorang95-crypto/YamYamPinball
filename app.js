@@ -2470,7 +2470,12 @@ document.addEventListener('visibilitychange',handleVisibilityContinuity,{passive
 window.addEventListener('pageshow',handleVisibilityContinuity,{passive:true});
 
 function draw(ts){
- try{drawFrame(ts)}catch(err){
+ try{
+  drawFrame(ts);
+  // 시작한 사람은 로컬 물리에서 당첨을 이미 알고 있으므로 매 프레임 Winner 표시를 확인한다.
+  // ui()/서버응답을 기다리지 않아 당첨공 진입 직후 바로 팝업이 뜬다.
+  renderWinner();
+ }catch(err){
   const now=performance.now();
   if(now-lastRenderErrorAt>1200){lastRenderErrorAt=now;console.error('렌더 자동복구',err);if($('conn'))$('conn').textContent='화면 자동복구 중'}
   // 렌더 오류가 나도 맵이 영구적으로 사라지지 않도록 다음 프레임을 반드시 계속 실행한다.
@@ -2643,10 +2648,10 @@ function renderRank(force=false){
 function renderWinner(){
  const card=$('winnerCard'),names=$('winnerNames');if(!card||!names||!state)return;
 
- // 예전 방식 복구: 시작한 사람은 로컬 물리에서 당첨 순번이 확정되는 즉시 팝업.
- // 서버 왕복, winnerPopupAt, 클로즈업 종료시간을 기다리지 않는다.
+ // 시작한 화면은 서버보다 먼저 실제 물리 결과를 알고 있으므로 로컬 결과를 최우선 사용한다.
  let hostLatch=(isRaceHost()&&localWinnerLatch&&Number(localWinnerLatch.raceId)===Number(state.raceId))?localWinnerLatch:null;
 
+ // 혹시 latch 호출이 한 프레임 늦더라도 sim.finish에서 당첨 순번이 이미 확정됐으면 즉시 latch를 만든다.
  if(isRaceHost()&&!hostLatch&&sim?.finish?.length){
    const targets=winningTargetRanks();
    const localWinner=sim.finish.find(q=>targets.includes(Number(q.rank)||0));
@@ -2660,14 +2665,13 @@ function renderWinner(){
    }
  }
 
- let winners=hostLatch?[hostLatch.winner]:(state.winners||[]);
+ let winners=state.winners||[];
+ if(hostLatch)winners=[hostLatch.winner];
+
  if(!winners.length&&state.status==='running'){
   const f=state.finishOrder||[];
   if(state.winMode==='first'&&f.length>=1)winners=[f[0]];
-  else if(state.winMode==='number'){
-    const ranks=state.winningRanks||[],max=Math.max(0,...ranks);
-    if(f.length>=max)winners=ranks.filter(r=>r<=f.length).map(r=>f[r-1]);
-  }
+  else if(state.winMode==='number'){const ranks=state.winningRanks||[],max=Math.max(0,...ranks);if(f.length>=max)winners=ranks.filter(r=>r<=f.length).map(r=>f[r-1])}
  }
  if(!winners.length){winnerPopupFirstSeenAt=0;card.classList.remove('show');return}
 
@@ -2676,15 +2680,19 @@ function renderWinner(){
 
  let ready=false;
  if(hostLatch){
+   // 호스트는 로컬 결승 판정 직후 약 0.25초 내 팝업.
+   // 관전자 서버 왕복보다 늦어지는 일이 없도록 서버 popupAt을 기다리지 않는다.
    ready=true;
  }else{
-   // 관전자는 기존 서버 확정 타이밍을 그대로 사용.
+   // 관전자는 서버가 확정한 공통 popupAt 사용.
    const popupAt=Number(state.winnerPopupAt||0);
    if(popupAt>0)ready=syncNow()>=popupAt;
    else ready=nowPerf-winnerPopupFirstSeenAt>=700;
  }
  if(!ready){card.classList.remove('show');return}
 
+ // 팝업이 뜬 뒤에도 마지막 당첨공 식별 연출은 별도로 유지한다.
+ // 팝업 때문에 focusBallId/finishZoom을 강제로 끄지 않는다.
  const winnerMarkup=winners.map(w=>`<span>${esc(w.name)}</span>`).join('');
  if(names.dataset.markup!==winnerMarkup){names.innerHTML=winnerMarkup;names.dataset.markup=winnerMarkup}
  card.classList.add('show');card.dataset.effectProfile='global';
