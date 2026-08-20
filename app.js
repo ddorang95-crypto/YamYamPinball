@@ -1930,17 +1930,33 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   sim.last=ts;sim.acc=0;sim.lastStepAt=ts;
  }
  if(isRaceHost()&&sim&&localRunning&&!sim.paused&&!document.hidden){
+  // 원래 핀볼 진행속도 복원:
+  // 서버 targetTick을 따라잡기 위해 한 화면 프레임에서 물리를 여러 번 돌리는 catch-up을 제거한다.
+  // 실제 브라우저에서 흐른 시간만큼만 고정 8.333ms 물리 스텝을 소비한다.
   const physicsStep=8.333;
   if(!Number.isFinite(sim.sharedTick))sim.sharedTick=0;
-  const elapsed=Math.max(0,syncNow()-Number(state?.startedAt||syncNow()));
-  const targetTick=Math.floor(elapsed/physicsStep);
-  let missing=Math.max(0,targetTick-sim.sharedTick);
-  // 모든 화면은 같은 서버 타임라인의 같은 tick 번호까지 계산한다.
-  // 한 프레임에 과도한 계산을 몰아 브라우저가 멈추지 않도록 제한한다.
-  const maxCatch=(sim.balls?.length||0)>800?3:8;
-  let loops=Math.min(missing,maxCatch);
-  while(loops-->0){step(physicsStep);sim.sharedTick++}
-  // 스냅샷은 시작한 화면만 복구용으로 저주기 저장. 다른 화면에는 진행 중 적용하지 않는다.
+  if(!Number.isFinite(sim.lastFramePhysicsAt))sim.lastFramePhysicsAt=ts;
+  const frameDt=Math.min(50,Math.max(0,ts-sim.lastFramePhysicsAt));
+  sim.lastFramePhysicsAt=ts;
+
+  // 기존 updateSlowMotion() 값도 다시 실제 물리속도에 적용한다.
+  // 평상시 wheel=1배, greed=기존 기본값, 당첨 직전에는 기존 슬로우 연출 그대로.
+  const slow=clamp(updateSlowMotion(performance.now()),.14,1);
+  sim.slowTarget=slow;
+  sim.slowScale=slow;
+  sim.acc=Math.min(80,Math.max(0,Number(sim.acc)||0)+frameDt*slow);
+
+  let loops=0;
+  // 렉이 있었다고 수백 tick을 몰아서 처리하지 않는다. 최대 6 step까지만 정상 프레임 복구.
+  while(sim.acc>=physicsStep&&loops<6){
+   step(physicsStep);
+   sim.sharedTick++;
+   sim.acc-=physicsStep;
+   loops++;
+  }
+  if(loops>=6)sim.acc=Math.min(sim.acc,physicsStep);
+
+  // 중계 빈도만 유지. 물리속도에는 영향을 주지 않는다.
   const snapshotGap=sim.balls.length>800?150:sim.balls.length>500?115:sim.balls.length>250?75:40;
   if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
  }
