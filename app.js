@@ -59,21 +59,15 @@ function normalizeSnapshot(snap){
 function queueRemoteSnapshot(snap){
  if(isRaceHost()||!snap||!Array.isArray(snap.balls))return;
  const seq=Number(snap.seq)||0;
+ // 오직 seq만으로 최신 여부를 판단한다. 서로 다른 PC의 시계 차이로 fresh frame을 버리지 않는다.
  if(seq&&seq<lastAcceptedSnapshotSeq)return;
-
- const sentAt=Number(snap.sentAt)||syncNow();
- const age=Math.max(0,syncNow()-sentAt);
-
- // 관전자가 몇 초 밀린 오래된 프레임을 순서대로 재생하지 않도록 한다.
- // 900ms보다 오래된 backlog 프레임은 버리고 '현재에 가까운 최신 프레임'만 표시한다.
- if(age>900 && renderRemoteSnapshot)return;
-
- const frame={...snap,sentAt,_arrivalAt:performance.now(),seq};
+ const frame={...snap,_arrivalAt:performance.now(),seq};
  remoteFrameBuffer.length=0;
  remoteFrameBuffer.push(frame);
  renderRemoteSnapshot=frame;
  remoteSnapshotReceivedAt=performance.now();
 }
+
 function interpolateRemoteSnapshot(){
  if(isRaceHost())return state?.snapshot||null;
  // 지연 재생/과거 프레임 보간을 하지 않고 가장 최근 공식 프레임 하나만 사용한다.
@@ -128,9 +122,7 @@ function connectSnapshotSocket(){
     if(packet.kind!=='snapshot'||!packet.snapshot)return;
     const snap=normalizeSnapshot(packet.snapshot),seq=Number(snap.seq||0);
     if(seq<lastAcceptedSnapshotSeq)return;
-    const age=Math.max(0,syncNow()-Number(snap.sentAt||syncNow()));
-    // 네트워크 큐에 쌓인 과거 프레임은 상태에도 적용하지 않는다.
-    if(age>900&&renderRemoteSnapshot)return;
+    // 최신 seq는 무조건 적용. 오래된 프레임은 서버가 이미 latest-only로 폐기한다.
     lastAcceptedSnapshotSeq=seq;queueRemoteSnapshot(snap);
     if(!state)state={};state.snapshot=snap;
     if(packet.status)state.status=packet.status;
@@ -221,8 +213,7 @@ function connectRoomEvents(){
    if(packet.kind==='snapshot'&&packet.snapshot){
     if(isRaceHost()&&Number(packet.raceId)===Number(state?.raceId))return;
     const snap=normalizeSnapshot(packet.snapshot),seq=Number(snap.seq||0);
-    const age=Math.max(0,syncNow()-Number(snap.sentAt||syncNow()));
-    if(seq>=lastAcceptedSnapshotSeq&&!(age>900&&renderRemoteSnapshot)){
+    if(seq>=lastAcceptedSnapshotSeq){
      lastAcceptedSnapshotSeq=seq;queueRemoteSnapshot(snap);
      if(!state)state={};state.snapshot=snap;
      if(packet.status)state.status=packet.status;
@@ -1796,7 +1787,7 @@ const themes={wheel:{bg:'#180b25',line:'#ffb6e7',glow:'#ff7bd5',peg:'#ffe675',bu
 function smoothRemoteSource(source,ts){
  if(role==='admin')return source;
  const dt=Math.min(34,Math.max(4,ts-(lastRemoteFrameTs||ts-16)));lastRemoteFrameTs=ts;
- const frameAge=Math.max(0,syncNow()-Number((renderRemoteSnapshot||state?.snapshot)?.sentAt||syncNow()));
+ const frameAge=Math.max(0,performance.now()-Number((renderRemoteSnapshot||{})._arrivalAt||remoteSnapshotReceivedAt||performance.now()));
  const age=clamp(ts-(remoteSnapshotReceivedAt||ts),0,110);
  const ease=frameAge>350?1:(1-Math.exp(-dt/26)),seen=new Set(),out=[];
  for(const b of source){

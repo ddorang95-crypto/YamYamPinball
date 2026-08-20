@@ -1,0 +1,18 @@
+관전자 공/화면 정지 수정
+
+원인:
+- 직전 버전에서 '900ms 이상 오래된 snapshot 폐기'를 판단할 때
+  시작자 PC의 sentAt과 관전자 PC의 syncNow()를 직접 비교함.
+- 두 PC의 서버시계 보정값/연결 시점 차이가 0.9초 이상이면
+  실제로 방금 도착한 최신 프레임도 오래된 것으로 오판해 계속 버림.
+- 첫 프레임만 남고 이후 프레임이 모두 폐기되어 관전자 공/카메라가 멈춰 보였음.
+
+수정:
+1. 관전자 최신 프레임 판정은 timestamp가 아니라 snapshot seq만 사용.
+2. seq가 더 최신이면 무조건 적용.
+3. 오래된 네트워크 backlog 폐기는 서버 WebSocket의 latest-only 큐에서 담당.
+4. 클라이언트 remoteFrameBuffer도 여전히 최신 프레임 1개만 유지.
+5. 화면 smoothing의 frameAge는 PC 간 시각 비교가 아니라 관전자 브라우저의 실제 도착시간(performance.now) 기준.
+6. 독립물리는 사용하지 않음. 시작자만 공식 물리, 관전자는 공식 최신 프레임 표시.
+
+app.js 수정이 핵심. server.js는 직전 latest-only 서버 그대로 포함.
