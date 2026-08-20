@@ -69,9 +69,7 @@ function newRoom(code) {
     updatedAt: now(),
     snapshotSeq: 0,
     interactionSeq: 0,
-    raceHostId: '',
-    officialEventSeq: 0,
-    officialEvents: []
+    raceHostId: ''
   };
 }
 
@@ -92,8 +90,6 @@ function backToLobby(room) {
   room.startedAt = 0;
   room.duration = 0;
   room.raceHostId = '';
-  room.officialEventSeq = 0;
-  room.officialEvents = [];
 }
 
 function randomSeed() {
@@ -251,8 +247,6 @@ function handleAction(res, data) {
       room.startedAt = now() + 1400;
       room.duration = 0;
       room.raceHostId = String(data.clientId || '');
-      room.officialEventSeq = 1;
-      room.officialEvents = [{seq:1,type:'raceStart',raceId:room.raceId,at:room.startedAt,payload:{}}];
       room.status = 'running';
       touch(room);
       broadcastRoom(room);
@@ -274,7 +268,7 @@ function handleAction(res, data) {
             cam: Number(data.cam || 0),
             camX: Number(data.camX || 560),
             camZoom: Number(data.camZoom || 0.82),
-            sentAt: now(),
+            sentAt: Number(data.sentAt || 0),
             seq, raceId
           };
           touch(room);
@@ -304,13 +298,7 @@ function handleAction(res, data) {
         const id = String(data.ballId || '');
         if (!room.finishOrder.some((x) => x.ballId === id)) {
           const ball = room.raceBalls.find((x) => x.ballId === id);
-          if (ball) {
-            const rank=room.finishOrder.length+1,at=now()+650;
-            const item={ballId:ball.ballId,name:ball.name,copy:ball.copy,owner:ball.owner,ownerInitial:ball.ownerInitial||ownerInitial(ball.owner),rank,at};
-            room.finishOrder.push(item);
-            room.officialEvents.push({seq:++room.officialEventSeq,type:'ballFinish',raceId:room.raceId,at,payload:item});
-            if(room.officialEvents.length>100)room.officialEvents.splice(0,room.officialEvents.length-100);
-          }
+          if (ball) room.finishOrder.push({ ballId: ball.ballId, name: ball.name, copy: ball.copy, owner: ball.owner, ownerInitial: ball.ownerInitial || ownerInitial(ball.owner), rank: room.finishOrder.length + 1 });
         }
         if (!room.winnerDeclared) {
           let ready = false;
@@ -322,9 +310,6 @@ function handleAction(res, data) {
             else if (room.winMode === 'last') room.winners = [room.finishOrder[room.finishOrder.length - 1]];
             else room.winners = room.winningRanks.map((rank) => room.finishOrder[rank - 1]).filter(Boolean);
             room.winnerDeclared = true;
-            const at=now()+700;
-            room.officialEvents.push({seq:++room.officialEventSeq,type:'winnerResolved',raceId:room.raceId,at,payload:{winners:room.winners,winMode:room.winMode,winningRanks:room.winningRanks}});
-            if(room.officialEvents.length>100)room.officialEvents.splice(0,room.officialEvents.length-100);
           }
         }
         touch(room);
@@ -332,11 +317,7 @@ function handleAction(res, data) {
       break;
     }
     case 'completeRace': {
-      if (room.status === 'running' && String(data.clientId || '') === String(room.raceHostId || '')) {
-        room.status='completed';
-        room.officialEvents.push({seq:++room.officialEventSeq,type:'raceComplete',raceId:room.raceId,at:now()+650,payload:{}});
-        touch(room);
-      }
+      if (room.status === 'running' && String(data.clientId || '') === String(room.raceHostId || '')) { room.status = 'completed'; touch(room); }
       break;
     }
     case 'resetRace': {
@@ -440,20 +421,19 @@ function wsFrame(text) {
   return Buffer.concat([head, payload]);
 }
 function wsBroadcastSnapshot(room, packet, source) {
-  const key=cleanRoom(room.code),clients=roomSockets.get(key);
-  if(!clients||!clients.size)return;
-  const frame=wsFrame(JSON.stringify(packet));
-  for(const sock of [...clients]){
-    if(sock.destroyed||!sock.writable)continue;
-    try{
-      if(sock.writableLength>180000){sock.__latestSnapshotFrame=frame;continue}
+  const key = cleanRoom(room.code);
+  const clients = roomSockets.get(key);
+  if (!clients || !clients.size) return;
+  const frame = wsFrame(JSON.stringify(packet));
+  for (const sock of [...clients]) {
+    if (sock === source || sock.destroyed || !sock.writable) continue;
+    try {
+      // 느린 관전자는 이전 프레임을 쌓지 않고 최신 프레임만 받는다.
+      if (sock.writableLength > 260000) continue;
       sock.write(frame);
-      if(sock.__latestSnapshotFrame&&sock.writableLength<90000){
-        const latest=sock.__latestSnapshotFrame;sock.__latestSnapshotFrame=null;sock.write(latest);
-      }
-    }catch{clients.delete(sock);try{sock.destroy()}catch{}}
+    } catch { clients.delete(sock); try { sock.destroy(); } catch {} }
   }
-  if(!clients.size)roomSockets.delete(key);
+  if (!clients.size) roomSockets.delete(key);
 }
 function parseWsFrames(socket, chunk) {
   socket.__wsBuffer = Buffer.concat([socket.__wsBuffer || Buffer.alloc(0), chunk]);
@@ -479,7 +459,7 @@ function parseWsFrames(socket, chunk) {
       const seq = Number(msg.snapshot.seq || msg.seq || 0);
       if (seq <= Number(room.snapshotSeq || 0)) continue;
       room.snapshotSeq = seq;
-      room.snapshot = {...msg.snapshot,sentAt:now()};
+      room.snapshot = msg.snapshot;
       room.status = msg.status || room.status;
       if (msg.raceId != null) room.raceId = Number(msg.raceId) || room.raceId;
       touch(room);
@@ -502,7 +482,7 @@ function openSnapshotSocket(req, socket, head, url) {
   socket.on('error', () => { try { socket.destroy(); } catch {} });
   if (head && head.length) parseWsFrames(socket, head);
   const room = getRoom(roomCode);
-  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot ? {...room.snapshot,sentAt:now()} : room.snapshot }))); } catch {}
+  try { socket.write(wsFrame(JSON.stringify({ kind: 'snapshot', raceId: room.raceId, status: room.status, snapshot: room.snapshot }))); } catch {}
 }
 
 function serveStatic(req, res, pathname) {
