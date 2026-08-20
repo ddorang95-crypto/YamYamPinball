@@ -1,0 +1,23 @@
+관전자 공 정지 문제 - 전용 프레임 펌프 방식
+
+이번에는 WebSocket/SSE만 계속 손대는 대신 관전자 전용 최신 프레임 API를 별도로 추가.
+
+서버:
+- GET /api/frame?room=... 추가.
+- 현재 room.snapshot만 가볍게 반환.
+- snapshot 저장 시 카메라/줌/포커스/당첨연출 winnerFlash까지 보존.
+
+시작자:
+- 기존 실제 물리만 실행.
+- 약 58ms 간격으로 서버 room.snapshot을 반드시 갱신.
+- WebSocket도 동시에 사용하지만 필수 경로가 아님.
+
+관전자:
+- 경기 중 약 62ms마다 /api/frame을 직접 호출.
+- 받은 snapshot을 renderRemoteSnapshot으로 즉시 그림.
+- WebSocket, SSE, 일반 /api/state와 완전히 독립적인 중계 경로.
+- 그래서 WebSocket 연결이 실패하거나 SSE가 막혀도 공 낙하와 카메라가 계속 움직여야 함.
+- 독립물리 아님. 시작자의 공식 공 좌표/카메라를 그대로 표시.
+
+기존 원래 공속도/마지막 2.2초 당첨공 식별 연출 유지.
+app.js + server.js 둘 다 교체 필요.

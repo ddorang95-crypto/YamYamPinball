@@ -270,6 +270,10 @@ function handleAction(res, data) {
             cam: Number(data.cam || 0),
             camX: Number(data.camX || 560),
             camZoom: Number(data.camZoom || 0.82),
+            focusBallId: String(data.focusBallId || ''),
+            focusRemainingMs: Math.max(0, Number(data.focusRemainingMs || 0)),
+            winnerResolved: !!data.winnerResolved,
+            winnerFlash: data.winnerFlash && typeof data.winnerFlash === 'object' ? data.winnerFlash : null,
             sentAt: Number(data.sentAt || 0),
             seq, raceId
           };
@@ -567,6 +571,23 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (url.pathname === '/health') return json(res, 200, { ok: true });
     if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: clientState(getRoom(url.searchParams.get('room'))) });
+    if (url.pathname === '/api/frame' && req.method === 'GET') {
+      const r = getRoom(url.searchParams.get('room'));
+      return json(res, 200, {
+        ok: true,
+        raceId: r.raceId,
+        status: r.status,
+        raceHostId: r.raceHostId,
+        snapshotSeq: r.snapshotSeq || 0,
+        snapshot: r.snapshot,
+        finishOrder: r.finishOrder,
+        winners: r.winners,
+        winnerDeclared: r.winnerDeclared,
+        winnerPopupAt: r.winnerPopupAt || 0,
+        serverNow: now()
+      });
+    }
+    
     if (url.pathname === '/api/events' && req.method === 'GET') return openRoomStream(req, res, url.searchParams.get('room'));
     if (url.pathname === '/api/action' && req.method === 'POST') {
       try { return handleAction(res, await readJson(req)); }

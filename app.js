@@ -196,8 +196,7 @@ function scheduleSharedRace(incoming){
    localRunning=false;
    localRaceConfig=null;
    sim=null;
-   remoteFrameBuffer.length=0;
-   renderRemoteSnapshot=null;
+   viewerFramePumpSeq=0;
    lastAcceptedSnapshotSeq=0;
    // 이미 열린 WebSocket은 절대 끊지 않는다. 닫혀 있을 때만 복구.
    if(!snapshotSocket||snapshotSocket.readyState>1)connectSnapshotSocket();
@@ -300,6 +299,56 @@ function connectRoomEvents(){
  };
  eventSource.onerror=()=>{if($('conn'))$('conn').textContent='실시간 재연결 중'};
 }
+
+
+let viewerFramePumpBusy=false,viewerFramePumpTimer=0,viewerFramePumpSeq=0;
+async function pumpViewerFrame(){
+  clearTimeout(viewerFramePumpTimer);
+  if(!state||state.status!=='running'||isRaceHost()){
+    viewerFramePumpTimer=setTimeout(pumpViewerFrame,220);
+    return;
+  }
+  if(viewerFramePumpBusy){
+    viewerFramePumpTimer=setTimeout(pumpViewerFrame,55);
+    return;
+  }
+  viewerFramePumpBusy=true;
+  try{
+    const r=await fetch('/api/frame?room='+encodeURIComponent(room)+'&_='+Date.now(),{
+      cache:'no-store',
+      headers:{'Cache-Control':'no-cache'}
+    });
+    if(!r.ok)throw Error('frame');
+    const j=await r.json();
+    if(j?.serverNow)syncNoteClock(j.serverNow);
+    if(j&&Number(j.raceId)===Number(state.raceId)){
+      const snap=normalizeSnapshot(j.snapshot);
+      const seq=Number(snap?.seq||j.snapshotSeq||0);
+      // 관전자 화면은 서버의 공식 최신 프레임을 직접 그린다.
+      // WebSocket/SSE가 고장나도 이 경로는 별도로 계속 움직인다.
+      if(snap&&Array.isArray(snap.balls)&&seq>=viewerFramePumpSeq){
+        viewerFramePumpSeq=seq;
+        lastAcceptedSnapshotSeq=Math.max(lastAcceptedSnapshotSeq,seq);
+        renderRemoteSnapshot={...snap,_arrivalAt:performance.now()};
+        remoteFrameBuffer.length=0;
+        remoteFrameBuffer.push(renderRemoteSnapshot);
+        remoteSnapshotReceivedAt=performance.now();
+        state.snapshot=snap;
+      }
+      if(j.status)state.status=j.status;
+      if(Array.isArray(j.finishOrder))state.finishOrder=j.finishOrder;
+      if(Array.isArray(j.winners))state.winners=j.winners;
+      state.winnerDeclared=!!j.winnerDeclared;
+      if(j.winnerPopupAt!=null)state.winnerPopupAt=Number(j.winnerPopupAt)||0;
+    }
+  }catch(_){}
+  finally{
+    viewerFramePumpBusy=false;
+    // 약 16fps. 공 수가 많아도 관전자 렌더가 충분히 부드럽고 서버 부하를 과하게 늘리지 않는다.
+    viewerFramePumpTimer=setTimeout(pumpViewerFrame,62);
+  }
+}
+setTimeout(pumpViewerFrame,180);
 
 let viewerFrameWatchdog=0;
 function ensureViewerFrameStream(){
@@ -1843,23 +1892,24 @@ function step(dt){
  if(sim.finish.length>=sim.balls.length&&!sim.completionSent){sim.completionSent=true;String(state?.raceHostId||'')===String(clientId)&&apiQuiet('completeRace').catch(()=>{})}
  if(sim.balls.every(b=>b.done))sim.paused=true
 }
+let lastHttpSnapshotAt=0;
 function sendSnapshot(){
  if(!sim||resetInFlight||mutationBusy||String(state?.raceHostId||'')!==String(clientId))return;
  const activeSim=sim;
  const active=activeSim.balls.filter(b=>!b.done||String(b.ballId)===String(activeSim.focusBallId||''));
  const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),focusBallId:String(activeSim.focusBallId||''),focusRemainingMs:Math.max(0,Math.round(Number(activeSim.finishZoomUntil||0)-performance.now())),winnerResolved:!!activeSim.winnerResolved,winnerFlash:activeSim.finishFlash?{ballId:String(activeSim.finishFlash.ballId||''),name:String(activeSim.finishFlash.name||''),copy:Number(activeSim.finishFlash.copy||1),rank:Number(activeSim.finishFlash.rank||0),remainingMs:Math.max(0,Math.round(Number(activeSim.finishFlash.until||0)-performance.now()))}:null,sentAt:syncNow()}};
 
- // 1차: WebSocket 실시간 중계.
- if(snapshotSocketReady&&snapshotSocket?.readyState===WebSocket.OPEN&&snapshotSocket.bufferedAmount<180000){
+ // 빠른 WebSocket 경로
+ if(snapshotSocketReady&&snapshotSocket?.readyState===WebSocket.OPEN&&snapshotSocket.bufferedAmount<150000){
    try{snapshotSocket.send(JSON.stringify(payload))}catch{}
  }
 
- // 2차: 서버 room.snapshot도 반드시 계속 갱신한다.
- // 직전 구조는 WS 전송 성공 시 return해 버려서 HTTP/SSE fallback에 공 좌표가 남지 않을 수 있었다.
- // 관전자는 이 서버 공식 snapshot을 120ms마다 읽을 수 있으므로 WS가 안 되는 환경에서도 반드시 움직인다.
- if(snapshotInFlight)return;
+ // 관전자 전용 /api/frame가 반드시 움직이도록 서버의 공식 snapshot을 꾸준히 갱신.
+ const nowP=performance.now();
+ if(nowP-lastHttpSnapshotAt<58||snapshotInFlight)return;
+ lastHttpSnapshotAt=nowP;
  const epoch=lifecycleEpoch;snapshotInFlight=true;
- apiQuiet('snapshot',payload.snapshot,1800).catch(()=>{}).finally(()=>{if(epoch===lifecycleEpoch)snapshotInFlight=false});
+ apiQuiet('snapshot',payload.snapshot,1600).catch(()=>{}).finally(()=>{if(epoch===lifecycleEpoch)snapshotInFlight=false});
 }
 function drawMap(ctx,map,theme){ctx.strokeStyle=theme.line;ctx.lineWidth=4;ctx.shadowColor=theme.glow;ctx.shadowBlur=10;ctx.lineCap='round';for(const g of map.s){ctx.beginPath();ctx.moveTo(g.x1,g.y1);ctx.lineTo(g.x2,g.y2);ctx.stroke()}ctx.shadowBlur=0;for(const q of map.p){ctx.fillStyle=theme.peg;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill()}for(const q of map.bum){ctx.fillStyle=theme.bump;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,7);ctx.fill();ctx.strokeStyle=theme.line;ctx.lineWidth=3;ctx.stroke()}for(const q of map.kick||[]){ctx.save();ctx.translate(q.x,q.y);ctx.fillStyle=theme.bump;ctx.globalAlpha=.82;ctx.beginPath();ctx.arc(0,0,q.r,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='bold 25px Arial';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(q.dir>0?'➜':'➜',0,1);ctx.restore()}for(const d of map.decor||[]){ctx.save();ctx.globalAlpha=.65;ctx.font='42px Arial';ctx.textAlign='center';ctx.fillText(d.kind==='candy'?'🍭':d.kind==='cloud'?'☁️':'🍄',d.x,d.y);ctx.restore()}
  if(map.finishGateY){
