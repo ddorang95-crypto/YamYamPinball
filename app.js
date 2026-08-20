@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v))
 const ADMIN_PREFS_KEY='yamyam_pinball_admin_prefs_'+room;
 // 모든 맵이 공유하는 기본 핀볼 연출 설정. 맵을 바꾸거나 경기를 초기화해도 이 값은 사라지지 않는다.
 const GLOBAL_PINBALL_EFFECTS=Object.freeze({
- winnerCloseupMs:900,
+ winnerCloseupMs:2200,
  winnerHideAfterCloseup:true,
  winnerPopupPersistent:true,
  winnerReturnToMain:true,
@@ -431,7 +431,7 @@ function latchLocalWinner(ball){
  if(!localWinnerLatch||Number(localWinnerLatch.raceId)!==Number(state.raceId)){
    localWinnerLatch={
      raceId:Number(state.raceId)||0,
-     popupAtPerf:performance.now()+700,
+     popupAtPerf:performance.now()+2200,
      winner:{ballId:ball.ballId,name:ball.name,copy:ball.copy,owner:ball.owner,ownerInitial:ball.ownerInitial,rank}
    };
  }
@@ -1119,18 +1119,28 @@ function stepOriginalBox2D(dt){
    if(winningTargetRanks().includes(Number(b.rank)||0))latchLocalWinner(b);
    if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
    if(winningTargetRanks().includes(fin.rank)){
-    // 두 맵 공통: 당첨 공을 1.5초 클로즈업한 뒤 숨기고, 메인 구도로 복귀하면서 Winner 팝업을 유지한다.
+    // Box2D도 동일하게: 당첨공 확정 후 2.2초 동안 정확히 보여준 뒤 팝업.
     const winnerCloseupMs=Number(sim.effects?.winnerCloseupMs)||GLOBAL_PINBALL_EFFECTS.winnerCloseupMs;
+    b.winnerHoldUntil=now+winnerCloseupMs;
     sim.winnerResolved=true;sim.winnerResolvedAt=now;sim.winnerPopupReady=false;sim.winnerPopupReadyAt=0;sim.winnerPopupNotBefore=now+winnerCloseupMs;
-    sim.focusBallId=b.ballId;sim.finishFlash=null;sim.finishZoomStart=now;sim.finishZoomUntil=now+winnerCloseupMs;sim.firstWinnerPreview=true;
-    delete b.winnerHideAt;b.finishVisualUntil=now+5200;
+    sim.focusBallId=b.ballId;sim.finishZoomStart=now;sim.finishZoomUntil=now+winnerCloseupMs;sim.firstWinnerPreview=true;
+    sim.finishFlash={ballId:b.ballId,name:b.name,copy:b.copy,rank:b.rank,startAt:now,peakAt:now+420,holdUntil:now+1750,until:now+winnerCloseupMs};
+    delete b.winnerHideAt;b.finishVisualUntil=now+6200;
     sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
    }
   }
   if(!b.done&&b.qualified){
    const isWinner=winningTargetRanks().includes(b.rank);
+   if(isWinner&&Number(b.winnerHoldUntil||0)>now){
+    try{
+      const holdY=Number(stage.goalY)+2.4;
+      body.SetTransform(new B.b2Vec2(pos.x,Math.min(pos.y,holdY)),body.GetAngle());
+      body.SetLinearVelocity(new B.b2Vec2(vel.x*.18,.10));
+      pos=body.GetPosition();
+    }catch(_){}
+   }
    const winnerCloseupDone=isWinner&&Number.isFinite(Number(b.winnerHideAt))&&now>=Number(b.winnerHideAt);
-   if((isWinner&&wpY>stage.goalY+12)||(!isWinner&&wpY>stage.goalY+12)){
+   if((isWinner&&now>=Number(b.winnerHoldUntil||0)&&wpY>stage.goalY+12)||(!isWinner&&wpY>stage.goalY+12)){
     b.done=true;world.DestroyBody(body);bodies.delete(String(b.ballId));
     if(isWinner&&sim.winnerResolved){
      sim.winnerPopupReady=true;sim.winnerPopupReadyAt=Math.max(now,Number(sim.winnerPopupNotBefore||0));sim.firstWinnerPreview=false;
@@ -1688,8 +1698,13 @@ function step(dt){
     }else{
      b.fastDrain=false;
      b.vx*=.996;
-     const finalCap=winnerGap<=1?.064:winnerGap<=3?.078:.092;
-     if(b.vy>finalCap)b.vy+=(finalCap-b.vy)*.16;
+     const finalCap=winnerGap<=0?.030:winnerGap<=1?.040:winnerGap<=3?.070:.092;
+     if(b.vy>finalCap)b.vy+=(finalCap-b.vy)*.24;
+     // 바로 다음 당첨공 후보는 결승 입구에서 눈으로 식별할 수 있게 좌우 흔들림도 줄인다.
+     if(winnerGap===0&&String(sim.focusBallId||'')===String(b.ballId||'')){
+       b.vx*=.90;
+       b.vy=Math.min(b.vy,.034);
+     }
     }
    }
   }
@@ -1741,13 +1756,15 @@ function step(dt){
    const isWinner=winningTargetRanks().includes(fin.rank);
    sim.finishFocusUntil=now+(isWinner&&!preResolvedLastWinner?2200:1200);
    if(isWinner&&!preResolvedLastWinner){
-    // 일반 당첨 모드는 기존처럼 당첨 공 클로즈업 후 팝업을 표시한다.
-    const winnerCloseupMs=900;
-    b.finishVisualUntil=now+5200;
+    // 당첨공을 정확히 확인할 수 있도록: 진입 확정 -> 2.2초 클로즈업 -> 팝업 순서.
+    const winnerCloseupMs=2200;
+    b.finishVisualUntil=now+6200;
+    b.winnerHoldUntil=now+winnerCloseupMs;
     delete b.winnerHideAt;
     sim.winnerResolved=true;sim.winnerResolvedAt=now;sim.winnerPopupReady=false;sim.winnerPopupReadyAt=0;sim.winnerPopupNotBefore=now+winnerCloseupMs;
-    sim.slowRank=0;sim.slowUntil=now+winnerCloseupMs;sim.slowTarget=.32;
-    sim.focusBallId=b.ballId;sim.finishZoomStart=now;sim.finishZoomUntil=now+winnerCloseupMs;sim.firstWinnerPreview=true;sim.finishFlash=null;
+    sim.slowRank=0;sim.slowUntil=now+winnerCloseupMs;sim.slowTarget=.20;
+    sim.focusBallId=b.ballId;sim.finishZoomStart=now;sim.finishZoomUntil=now+winnerCloseupMs;sim.firstWinnerPreview=true;
+    sim.finishFlash={ballId:b.ballId,name:b.name,copy:b.copy,rank:b.rank,startAt:now,peakAt:now+420,holdUntil:now+1750,until:now+winnerCloseupMs};
     sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
    }
    if(!preResolvedLastWinner){
@@ -1762,7 +1779,13 @@ function step(dt){
   }
   if(b.qualified&&!b.done){
    const winner=winningTargetRanks().includes(b.rank);
-   b.vx*=winner?.88:.94;b.vy+=.00010*dt;b.vy=clamp(b.vy,winner?.010:.028,winner?.045:.14);
+   if(winner&&Number(b.winnerHoldUntil||0)>now){
+     // 당첨공이 결승선을 통과하자마자 사라지지 않게 아주 천천히 내려가며 화면 중앙에 남긴다.
+     b.vx*=.72;
+     b.vy=clamp(b.vy,.004,.014);
+   }else{
+     b.vx*=winner?.88:.94;b.vy+=.00010*dt;b.vy=clamp(b.vy,winner?.010:.028,winner?.045:.14);
+   }
    const winnerCloseupDone=winner&&Number.isFinite(Number(b.winnerHideAt))&&now>=Number(b.winnerHideAt);
    if((winner&&b.y>sim.map.finishY+440)||(!winner&&(b.y>sim.map.finishY+250||now>(b.finishVisualUntil||0)))){
     b.done=true;
@@ -1824,7 +1847,7 @@ function sendSnapshot(){
  if(!sim||resetInFlight||mutationBusy||String(state?.raceHostId||'')!==String(clientId))return;
  const activeSim=sim;
  const active=activeSim.balls.filter(b=>!b.done||String(b.ballId)===String(activeSim.focusBallId||''));
- const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),focusBallId:String(activeSim.focusBallId||''),focusRemainingMs:Math.max(0,Math.round(Number(activeSim.finishZoomUntil||0)-performance.now())),winnerResolved:!!activeSim.winnerResolved,sentAt:syncNow()}};
+ const payload={kind:'snapshot',room,seq:++snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),status:state?.status||'running',snapshot:{seq:snapshotSeq,raceId:Number(activeSim.raceId||state?.raceId||0),packed:1,balls:packSnapshotBalls(active),rot:activeSim.map.rot.map(r=>+r.a.toFixed(4)),gate:+(activeSim.map.gate?activeSim.map.gate.a:0).toFixed(4),cam:+activeSim.cam.toFixed(1),camX:+activeSim.camX.toFixed(1),camZoom:+activeSim.camZoom.toFixed(3),focusBallId:String(activeSim.focusBallId||''),focusRemainingMs:Math.max(0,Math.round(Number(activeSim.finishZoomUntil||0)-performance.now())),winnerResolved:!!activeSim.winnerResolved,winnerFlash:activeSim.finishFlash?{ballId:String(activeSim.finishFlash.ballId||''),name:String(activeSim.finishFlash.name||''),copy:Number(activeSim.finishFlash.copy||1),rank:Number(activeSim.finishFlash.rank||0),remainingMs:Math.max(0,Math.round(Number(activeSim.finishFlash.until||0)-performance.now()))}:null,sentAt:syncNow()}};
 
  // 1차: WebSocket 실시간 중계.
  if(snapshotSocketReady&&snapshotSocket?.readyState===WebSocket.OPEN&&snapshotSocket.bufferedAmount<180000){
@@ -2296,10 +2319,22 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   x.fillStyle=getNameColor(focusWinnerBall.name,1);x.beginPath();x.arc(px,py,rr,0,Math.PI*2);x.fill();x.lineWidth=5;x.strokeStyle='#fff';x.stroke();
   x.globalAlpha=.72;x.lineWidth=3;x.beginPath();x.arc(px,py,rr+10+beat*8,0,Math.PI*2);x.stroke();x.globalAlpha=1;x.shadowBlur=0;
   if(['GROUP','YAMYAM'].includes(String(room||'').toUpperCase())){const mark=String(focusWinnerBall.ownerInitial||ownerMark(focusWinnerBall.owner)||'?').slice(0,1);x.font='1000 26px Pretendard, Arial, sans-serif';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.82)';x.strokeText(mark,px,py+1);x.fillStyle='#fff';x.fillText(mark,px,py+1)}
-  x.font='1000 28px Pretendard, "Noto Sans KR", Arial, sans-serif';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.90)';x.strokeText(String(focusWinnerBall.name||'').slice(0,10),px,py+rr+27);x.fillStyle='#fff';x.fillText(String(focusWinnerBall.name||'').slice(0,10),px,py+rr+27);x.restore();
+  x.font='1000 28px Pretendard, "Noto Sans KR", Arial, sans-serif';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.90)';
+  const focusLabel=`${focusWinnerBall.rank?'#'+focusWinnerBall.rank+' · ':''}${String(focusWinnerBall.name||'').slice(0,10)}`;
+  x.strokeText(focusLabel,px,py+rr+27);x.fillStyle='#fff';x.fillText(focusLabel,px,py+rr+27);
+  x.font='900 18px Pretendard, Arial, sans-serif';x.lineWidth=4;x.strokeStyle='rgba(0,0,0,.9)';
+  x.strokeText('▼ 당첨공 확인',px,py-rr-26);x.fillStyle='#fff';x.fillText('▼ 당첨공 확인',px,py-rr-26);x.restore();
  }
- if(role==='admin'&&sim?.finishFlash&&performance.now()>=sim.finishFlash.startAt&&performance.now()<sim.finishFlash.until){
-  const f=sim.finishFlash,nowFx=performance.now();
+ const remoteWinnerFlash=(role!=='admin'&&liveSnapshot?.winnerFlash&&Number(liveSnapshot.winnerFlash.remainingMs||0)>0)?{
+   ...liveSnapshot.winnerFlash,
+   startAt:performance.now()-300,
+   peakAt:performance.now()+120,
+   holdUntil:performance.now()+Math.max(0,Number(liveSnapshot.winnerFlash.remainingMs||0)-450),
+   until:performance.now()+Number(liveSnapshot.winnerFlash.remainingMs||0)
+ }:null;
+ const activeWinnerFlash=(role==='admin'&&sim?.finishFlash)?sim.finishFlash:remoteWinnerFlash;
+ if(activeWinnerFlash&&performance.now()>=activeWinnerFlash.startAt&&performance.now()<activeWinnerFlash.until){
+  const f=activeWinnerFlash,nowFx=performance.now();
   const liveWinner=source.find(q=>String(q.ballId)===String(f.ballId))||f;
   const alpha=(role==='admin'&&sim)?clamp(sim.acc/8.333,0,1):1;
   const wx=(Number.isFinite(liveWinner.prevX)?liveWinner.prevX+(liveWinner.x-liveWinner.prevX)*alpha:liveWinner.x);
@@ -2308,7 +2343,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   const grow=clamp((nowFx-f.startAt)/Math.max(1,(f.peakAt||f.startAt+850)-f.startAt),0,1);
   const smooth=grow*grow*(3-2*grow);
   const fade=nowFx>(f.holdUntil||f.until-900)?clamp((f.until-nowFx)/Math.max(1,f.until-(f.holdUntil||f.until-900)),0,1):1;
-  const rr=(b.r||R)*sx*(1+smooth*1.55);
+  const rr=(liveWinner.r||R)*sx*(1+smooth*1.55);
   x.save();x.fillStyle=`rgba(3,6,18,${0.18+smooth*.34})`;x.fillRect(0,0,w,h);x.globalAlpha=fade;x.textAlign='center';x.textBaseline='middle';
   x.shadowColor=getNameColor(f.name,.98);x.shadowBlur=28+smooth*22;
   x.fillStyle=getNameColor(f.name,1);x.beginPath();x.arc(px,py,rr,0,Math.PI*2);x.fill();
