@@ -90,6 +90,7 @@ function restoreLobbyPreview(map,{clearParticipants=false}={}){
 }
 function clearWinnerPopupEverywhereLocal(){
  localWinnerLatch=null;
+ hostWinnerUrgentPaint=false;
  winnerPopupFirstSeenAt=0;
  lastWinnerRace=-1;
  const card=$('winnerCard');
@@ -453,7 +454,7 @@ function bindAdmin(){
   }
  };
  $('applyWin').onclick=()=>{const checked=document.querySelector('input[name=win]:checked');if(!checked)return;saveWin(checked.value)};
- $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;localStartHardNotBefore=performance.now()+5000;showStartCountdown();const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;localWinnerLatch=null;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();showStartCountdown();if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
+ $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;localStartHardNotBefore=performance.now()+3000;showStartCountdown();const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;localWinnerLatch=null;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();showStartCountdown();if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
   if(resetInFlight)return;
   // 누르는 즉시 이 화면의 결과 팝업 제거.
   clearWinnerPopupEverywhereLocal();
@@ -500,6 +501,24 @@ function flash(t){const m=$('msg');if(!m)return;m.textContent=t;setTimeout(()=>{
 function bindMember(){owner=localStorage.getItem('pin_owner')||'';$('ownerInput').value=owner;$('saveOwner').onclick=()=>{owner=$('ownerInput').value.trim();localStorage.setItem('pin_owner',owner);flash('저장 완료')};$('addBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('addParticipant',{name:$('nameInput').value,count:+$('countInput').value||1,owner}).then(()=>{$('nameInput').value=''})};$('bulkBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('bulkAdd',{items:parseBulk($('bulkInput').value),owner}).then(()=>{$('bulkInput').value=''})}}
 function ownerMark(value){const raw=String(value||'').trim(),v=raw.toLowerCase();if(v.includes('야미')||v==='y'||v.includes('yami'))return'얌';if(v.includes('꿀혜')||v==='g'||v.includes('ggul'))return'꿀';if(v.includes('선하')||v==='m'||v.includes('seonha'))return'선';if(v.includes('도릿')||v==='d'||v.includes('dorit'))return'도';return raw.slice(0,1).toUpperCase()||'?'}
 
+let hostWinnerUrgentPaint=false;
+function showHostWinnerPopupNow(winner){
+ if(!winner||!state)return;
+ const card=$('winnerCard'),names=$('winnerNames');
+ if(!card||!names)return;
+ const markup=`<span>${esc(winner.name)}</span>`;
+ if(names.dataset.markup!==markup){names.innerHTML=markup;names.dataset.markup=markup}
+ card.classList.add('show');
+ card.dataset.effectProfile='global';
+ if(lastWinnerRace!==state.raceId){
+   lastWinnerRace=state.raceId;
+   card.classList.remove('burst','winner-pop');
+   // 애니메이션은 다음 페인트에서 붙이고, show 자체는 지금 즉시 적용.
+   requestAnimationFrame(()=>{if(lastWinnerRace===state?.raceId)card.classList.add('winner-pop')});
+ }
+ hostWinnerUrgentPaint=true;
+}
+
 let localWinnerLatch=null;
 function latchLocalWinner(ball){
  if(!ball||!state)return;
@@ -512,6 +531,8 @@ function latchLocalWinner(ball){
      popupAtPerf:performance.now(),
      winner:{ballId:ball.ballId,name:ball.name,copy:ball.copy,owner:ball.owner,ownerInitial:ball.ownerInitial,rank}
    };
+   // 서버/UI 갱신을 기다리지 않고 당첨 판정 함수 안에서 Winner DOM을 바로 띄운다.
+   showHostWinnerPopupNow(localWinnerLatch.winner);
  }
 }
 
@@ -2063,12 +2084,19 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
    sim.sharedTick++;
    sim.acc-=physicsStep;
    loops++;
+   // 당첨공이 확정된 프레임에는 남은 catch-up 계산을 즉시 중단해 팝업 페인트를 우선한다.
+   if(hostWinnerUrgentPaint)break;
   }
   if(loops>=6)sim.acc=Math.min(sim.acc,physicsStep);
 
   // 중계 빈도만 유지. 물리속도에는 영향을 주지 않는다.
   const snapshotGap=sim.balls.length>800?150:sim.balls.length>500?115:sim.balls.length>250?75:40;
   if(ts-sim.lastSend>snapshotGap){sim.lastSend=ts;sendSnapshot()}
+  // Winner DOM은 이미 적용됐다. 이 한 프레임만 무거운 후반 렌더를 건너뛰어 브라우저가 즉시 페인트하게 한다.
+  if(hostWinnerUrgentPaint){
+    hostWinnerUrgentPaint=false;
+    return;
+  }
  }
  const mh=map.worldH||H,renderBaseScale=Math.min((w-250)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
  const q=(r)=>ys.length?ys[Math.min(ys.length-1,Math.floor((ys.length-1)*r))]:mh-200;
