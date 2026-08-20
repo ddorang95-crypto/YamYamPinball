@@ -244,7 +244,7 @@ function handleAction(res, data) {
       room.snapshotSeq = 0;
       room.raceId += 1;
       if (!(room.seed > 0)) room.seed = randomSeed();
-      room.startedAt = now() + 5000;
+      room.startedAt = now() + 6000;
       room.duration = 0;
       room.raceHostId = String(data.clientId || '');
       room.status = 'running';
@@ -291,6 +291,29 @@ function handleAction(res, data) {
         y: Math.max(0, Math.min(1, Number(it.y) || 0)),
         at: now()
       });
+      return json(res, 200, { ok: true });
+    }
+    case 'finishBalls': {
+      if (room.status === 'running' && String(data.clientId || '') === String(room.raceHostId || '')) {
+        const ids = Array.isArray(data.ballIds) ? data.ballIds.map(String).slice(0, 120) : [];
+        for (const id of ids) {
+          if (room.finishOrder.some((x) => x.ballId === id)) continue;
+          const ball = room.raceBalls.find((x) => x.ballId === id);
+          if (ball) room.finishOrder.push({ ballId: ball.ballId, name: ball.name, copy: ball.copy, owner: ball.owner, ownerInitial: ball.ownerInitial || ownerInitial(ball.owner), rank: room.finishOrder.length + 1 });
+        }
+        if (!room.winnerDeclared && room.finishOrder.length) {
+          const wanted = room.winMode === 'last'
+            ? [room.raceBalls.length]
+            : room.winMode === 'number' ? room.winningRanks : [1];
+          const winners = wanted.map((rank) => room.finishOrder[rank - 1]).filter(Boolean);
+          if (winners.length === wanted.length) {
+            room.winners = winners;
+            room.winnerDeclared = true;
+          }
+        }
+        touch(room);
+        broadcastRoom(room);
+      }
       return json(res, 200, { ok: true });
     }
     case 'finishBall': {

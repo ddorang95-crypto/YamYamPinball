@@ -149,6 +149,17 @@ function connectSnapshotSocket(){
  }catch{setTimeout(connectSnapshotSocket,1200)}
 }
 let syncClockOffset=0,syncStartTimer=0,syncStartRaceId=0;
+let localStartHardNotBefore=0,startCountdownTimer=0;
+function stopStartCountdown(){if(startCountdownTimer){clearInterval(startCountdownTimer);startCountdownTimer=0}}
+function showStartCountdown(){
+ stopStartCountdown();
+ const tick=()=>{
+  const remain=Math.max(0,Math.ceil((Math.max(Number(state?.startedAt||0)-syncNow(),localStartHardNotBefore-performance.now()))/1000));
+  if(remain>0)flash(`레이스 ${remain}초 뒤 동시 출발 준비`);
+  else stopStartCountdown();
+ };
+ tick();startCountdownTimer=setInterval(tick,500);
+}
 function syncNoteClock(serverNow,sent=null,recv=null){const n=Number(serverNow);if(!Number.isFinite(n))return;const ref=(Number.isFinite(Number(sent))&&Number.isFinite(Number(recv)))?(Number(sent)+Number(recv))/2:Date.now();const sample=n-ref;if(!syncClockOffset)syncClockOffset=sample;else syncClockOffset+=(sample-syncClockOffset)*.25}
 function syncNow(){return Date.now()+syncClockOffset}
 function cancelSyncStart(){if(syncStartTimer){clearTimeout(syncStartTimer);syncStartTimer=0}syncStartRaceId=0}
@@ -185,10 +196,12 @@ function scheduleSharedRace(incoming){
  const begin=()=>{
   syncStartTimer=0;
   if(!state||state.status!=='running'||Number(state.raceId)!==rid)return;
-  const remain=Number(state.startedAt||incoming.startedAt||0)-syncNow();
-  // 서버가 정한 공통 시작시각 전에는 어떤 PC에서도 절대 물리를 시작하지 않는다.
-  // 타이머가 일찍 깨거나 브라우저 시계 보정이 중간에 바뀌어도 다시 남은 시간만큼 기다린다.
-  if(remain>20){syncStartTimer=setTimeout(begin,Math.max(20,remain));return}
+  const serverRemain=Number(state.startedAt||incoming.startedAt||0)-syncNow();
+  const localRemain=isRaceHost()?localStartHardNotBefore-performance.now():0;
+  const remain=Math.max(serverRemain,localRemain);
+  // 서버 공통시각 + 시작자 로컬 최소 5초 게이트를 둘 다 통과해야만 시작한다.
+  if(remain>20){syncStartTimer=setTimeout(begin,Math.max(20,Math.min(remain,500)));return}
+  stopStartCountdown();
   stopLocalRace({clearParticipants:false});
   lastRace=rid;raceHostId=String(state.raceHostId||'');snapshotSeq=0;lastAcceptedSnapshotSeq=0;
   remoteFrameBuffer.length=0;renderRemoteSnapshot=null;
@@ -202,7 +215,7 @@ function scheduleSharedRace(incoming){
   }
  };
  const delay=Number(incoming.startedAt||0)-syncNow();
- if(delay>15)syncStartTimer=setTimeout(begin,delay);else begin();
+ if(delay>15)syncStartTimer=setTimeout(begin,Math.min(delay,500));else begin();
 }
 function connectRoomEvents(){
  if(!('EventSource' in window))return;
@@ -319,14 +332,14 @@ function bindAdmin(){
   }
  };
  $('applyWin').onclick=()=>{const checked=document.querySelector('input[name=win]:checked');if(!checked)return;saveWin(checked.value)};
- $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');syncNoteClock(j.serverNow);state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();flash('5초 뒤 모든 화면 동시 출발 준비!');if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
+ $('startBtn').onclick=async()=>{const btn=$('startBtn');if(btn.disabled)return;localStartHardNotBefore=performance.now()+5000;showStartCountdown();const winnerCard=$('winnerCard');if(winnerCard)winnerCard.classList.remove('show','burst','winner-pop');winnerPopupFirstSeenAt=0;lastWinnerRace=-1;const total=balls().length;if(!state||total<1){flash('공을 1개 이상 추가해주세요');return}const d=winDraft||{mode:state.winMode,ranks:state.winningRanks||[1]},map=selectedMapLock||$('mapSelect').value;btn.disabled=true;btn.textContent='동기화 중';try{const j=await apiQuiet('startRace',{map,winMode:d.mode,ranks:d.mode==='last'?[total]:d.ranks},6500);if(!j?.ok)throw Error(j?.error||'시작 오류');state={...state,map,status:'running',raceId:Number(j.raceId),seed:Number(j.seed),startedAt:Number(j.startedAt),raceHostId:String(j.raceHostId||clientId),winMode:j.winMode||d.mode,winningRanks:j.winningRanks||d.ranks,finishOrder:[],winners:[],winnerDeclared:false,snapshot:{balls:[],rot:[],cam:0}};raceHostId=state.raceHostId;snapshotSeq=0;lastAcceptedSnapshotSeq=0;scheduleSharedRace(state);ui();showStartCountdown();if(winDraft)winDraft.dirty=false}catch(e){flash('서버 동기화 오류: '+(e?.message||'통신 오류'))}finally{btn.disabled=false;btn.textContent='▶ 레이스 시작'}};$('resetBtn').onclick=async()=>{
   if(resetInFlight)return;
   resetInFlight=true;mutationBusy=true;
   const btn=$('resetBtn');if(btn){btn.disabled=true;btn.textContent='새 판 준비 중'}
   try{
    const j=await apiQuiet('resetRace',{},8000);
    if(!j?.ok)throw Error(j?.error||'초기화 오류');
-   cancelSyncStart();stopLocalRace({clearParticipants:false});
+   cancelSyncStart();stopStartCountdown();localStartHardNotBefore=0;stopLocalRace({clearParticipants:false});
    if(j.state)state=j.state;
    winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
    ui();flash('경기 초기화 전체 화면 적용 완료');
@@ -362,6 +375,25 @@ $('clearBtn').onclick=async()=>{
 function flash(t){const m=$('msg');if(!m)return;m.textContent=t;setTimeout(()=>{if(m.textContent===t)m.textContent=''},1800)}
 function bindMember(){owner=localStorage.getItem('pin_owner')||'';$('ownerInput').value=owner;$('saveOwner').onclick=()=>{owner=$('ownerInput').value.trim();localStorage.setItem('pin_owner',owner);flash('저장 완료')};$('addBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('addParticipant',{name:$('nameInput').value,count:+$('countInput').value||1,owner}).then(()=>{$('nameInput').value=''})};$('bulkBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('bulkAdd',{items:parseBulk($('bulkInput').value),owner}).then(()=>{$('bulkInput').value=''})}}
 function ownerMark(value){const raw=String(value||'').trim(),v=raw.toLowerCase();if(v.includes('야미')||v==='y'||v.includes('yami'))return'얌';if(v.includes('꿀혜')||v==='g'||v.includes('ggul'))return'꿀';if(v.includes('선하')||v==='m'||v.includes('seonha'))return'선';if(v.includes('도릿')||v==='d'||v.includes('dorit'))return'도';return raw.slice(0,1).toUpperCase()||'?'}
+
+let finishBallQueue=[],finishBallFlushTimer=0;
+function queueFinishBall(ballId){
+ const id=String(ballId||'');if(!id)return;
+ finishBallQueue.push(id);
+ if(!finishBallFlushTimer)finishBallFlushTimer=setTimeout(flushFinishBalls,75);
+}
+function flushFinishBalls(){
+ finishBallFlushTimer=0;
+ if(!finishBallQueue.length)return;
+ const ids=finishBallQueue.splice(0,80);
+ apiQuiet('finishBalls',{ballIds:ids},2400).catch(()=>{
+   // 서버가 아직 구버전인 아주 짧은 배포 순간에도 결과를 잃지 않도록 개별 전송 fallback.
+   ids.slice(0,12).forEach(id=>apiQuiet('finishBall',{ballId:id},1800).catch(()=>{}));
+ }).finally(()=>{
+   if(finishBallQueue.length&&!finishBallFlushTimer)finishBallFlushTimer=setTimeout(flushFinishBalls,75);
+ });
+}
+
 function balls(){const a=[];(state?.participants||[]).forEach(p=>{for(let i=1;i<=+p.count;i++)a.push({ballId:p.id+'_'+i,name:p.name,copy:i,owner:p.owner,ownerInitial:p.ownerInitial||ownerMark(p.owner)})});return a}
 function orderedBalls(){const a=balls(),rr=rnd((state?.seed||1)+(state?.shuffleNonce||0)*9973);for(let i=a.length-1;i>0;i--){const j=Math.floor(rr()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 function previewGridBalls(){
@@ -1023,7 +1055,7 @@ function stepOriginalBox2D(dt){
    const fin={...b,rank:b.rank};sim.finish.push(fin);
    // 서버 응답을 기다리지 않고 관리자 화면의 체크·순위를 실제 물리 결과와 즉시 동기화한다.
    if(state){state.finishOrder=sim.finish.map(q=>({ballId:q.ballId,name:q.name,copy:q.copy,rank:q.rank}));}
-   if(String(state?.raceHostId||'')===String(clientId))apiQuiet('finishBall',{ballId:b.ballId}).catch(()=>{});
+   if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
    if(winningTargetRanks().includes(fin.rank)){
     // 두 맵 공통: 당첨 공을 1.5초 클로즈업한 뒤 숨기고, 메인 구도로 복귀하면서 Winner 팝업을 유지한다.
     const winnerCloseupMs=Number(sim.effects?.winnerCloseupMs)||GLOBAL_PINBALL_EFFECTS.winnerCloseupMs;
@@ -1242,7 +1274,7 @@ function resolveLastStandingWinner(now){
  sim.bottomCameraLocked=false;
  sim.cameraHoldUntil=0;
  manualCam=null;
- if(String(state?.raceHostId||'')===String(clientId))apiQuiet('finishBall',{ballId:b.ballId}).catch(()=>{});
+ if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
  return b;
 }
 function tensionWindowInfo(){
@@ -1655,7 +1687,7 @@ function step(dt){
     sim.focusBallId=b.ballId;sim.finishZoomStart=now;sim.finishZoomUntil=now+winnerCloseupMs;sim.firstWinnerPreview=true;sim.finishFlash=null;
     sim.bottomCameraLocked=false;sim.cameraHoldUntil=0;manualCam=null;
    }
-   if(!preResolvedLastWinner)if(String(state?.raceHostId||'')===String(clientId))apiQuiet('finishBall',{ballId:b.ballId}).catch(()=>{});
+   if(!preResolvedLastWinner)if(String(state?.raceHostId||'')===String(clientId))queueFinishBall(b.ballId);
    if(!isWinner||preResolvedLastWinner){
     // 마지막 한 공은 팝업 뒤에서도 실제 결승 통로를 끝까지 자연스럽게 내려간다.
     b.vx*=.18;b.vy=clamp(b.vy,.022,.060);
