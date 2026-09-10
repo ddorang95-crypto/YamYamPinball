@@ -1217,3 +1217,58 @@ body.unified .participantList .personBallCount strong{position:static!important;
   letter-spacing:-.35px!important;
  }
 }
+
+
+/* v17.15: 입력·당첨 기준 영역 여백 축소 */
+body.unified .mergedEntryGroup #nameInput{
+ width:min(100%,360px)!important;
+ justify-self:start!important;
+}
+body.unified .mergedEntryGroup #bulkInput{
+ width:min(100%,520px)!important;
+ justify-self:start!important;
+}
+body.unified .win{
+ display:flex!important;
+ flex-wrap:wrap!important;
+ align-items:center!important;
+ justify-content:flex-start!important;
+ gap:7px!important;
+}
+body.unified .win>b{
+ flex:0 0 auto!important;
+ margin-right:2px!important;
+}
+body.unified .win .winChoice{
+ flex:0 0 auto!important;
+ width:auto!important;
+ min-width:112px!important;
+ padding:10px 13px!important;
+ justify-content:center!important;
+}
+body.unified .win #rankNumber{
+ flex:0 1 230px!important;
+ width:230px!important;
+ min-width:150px!important;
+}
+body.unified .win #applyWin{
+ flex:0 0 112px!important;
+ width:112px!important;
+}
+body.unified .win #winSaved{
+ flex:1 0 100%!important;
+}
+body.unified .mergedEntryGroup #shuffleBtn{
+ min-width:76px!important;
+ width:76px!important;
+ padding:0 10px!important;
+}
+@media (max-width:700px){
+ body.unified .mergedEntryGroup #nameInput,
+ body.unified .mergedEntryGroup #bulkInput{width:100%!important}
+ body.unified .win .winChoice{
+  min-width:0!important;
+  flex:1 1 105px!important;
+ }
+ body.unified .win #rankNumber{flex:1 1 150px!important;width:auto!important}
+}
