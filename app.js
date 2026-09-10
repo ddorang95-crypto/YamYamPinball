@@ -1089,11 +1089,11 @@ function stepOriginalBox2D(dt){
  const adaptiveGravity=10+pace1*2.8+pace2*3.6;
  // v15.10bo: 5배속은 내부 시간만 앞당기는 것이 아니라 실제 낙하 가속도도 강화한다.
  // 고정 5회 물리 스텝에 더해 중력과 하강 속도를 보정해 화면상 공이 확실히 빠르게 내려간다.
- const fastForwardGravity=canvasDragFastForward?Math.max(adaptiveGravity,18.5):adaptiveGravity;
+ const fastForwardGravity=canvasDragFastForward?Math.max(adaptiveGravity,14.5):adaptiveGravity;
  try{world.SetGravity(new B.b2Vec2(0,fastForwardGravity))}catch(_){ }
  // 빨리감기 중에는 핀볼 옆 회전 구조물도 실제 5배속으로 회전한다.
  // 단, 공을 과하게 튕겨내지 않도록 Impact 힘은 별도로 낮춰 배출 효율을 높인다.
- const kinematicSpeedMul=canvasDragFastForward?2.25:1;
+ const kinematicSpeedMul=canvasDragFastForward?1.6:1;
  for(const ent of entities){
   if(ent?.e?.type!=='kinematic')continue;
   const base=Number(ent.e?.props?.angularVelocity)||0;
@@ -1914,10 +1914,10 @@ function step(dt){
    const ffZone=sim.map.finalZone;
    const inLower=!!(ffZone&&b.y>ffZone.top-140);
    const inChute=!!(ffZone&&b.y>=ffZone.cleanDropTop-20);
-   const mul=inChute?1.34:(inLower?1.28:1.22);
-   b.vx=clamp(b.vx*mul,-(inChute?.34:.62),(inChute?.34:.62));
-   b.vy=clamp(b.vy*mul+(inChute?.085:(inLower?.055:.032)),-.42,inChute?2.35:(inLower?1.75:1.22));
-   // 배속 중 수치 오차나 강한 충돌로 맵 밖으로 나간 공은 벽 안쪽으로 반사 복귀시킨다.
+   // 매 틱 속도를 곱하지 않고 일정한 하강 보조만 더해 수치 폭주와 렉을 막는다.
+   const extraDrop=inChute?.075:(inLower?.048:.026);
+   b.vy=clamp(b.vy+extraDrop,-.42,inChute?2.1:(inLower?1.55:1.05));
+   b.vx=clamp(b.vx,-(inChute?.32:.58),(inChute?.32:.58));
    const edge=R+5;
    if(b.x<edge){b.x=edge;b.vx=Math.abs(b.vx)*.42}
    else if(b.x>W-edge){b.x=W-edge;b.vx=-Math.abs(b.vx)*.42}
@@ -2083,24 +2083,25 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
   const frameDt=Math.min(50,Math.max(0,ts-sim.lastFramePhysicsAt));
   sim.lastFramePhysicsAt=ts;
 
-  // 기존 updateSlowMotion() 값도 다시 실제 물리속도에 적용한다.
-  // 평상시 wheel=1배, greed=기존 기본값, 당첨 직전에는 기존 슬로우 연출 그대로.
+  // 배속은 프레임마다 물리 계산을 5번 반복하지 않는다.
+  // 계산 횟수는 평상시와 같게 유지하고 한 스텝의 시간만 3배로 보내 대량 공에서도 렉을 막는다.
   const slow=clamp(updateSlowMotion(performance.now()),.14,1);
+  const winnerCinematic=!!(sim.focusBallId&&(performance.now()<sim.finishZoomUntil||sim.winnerResolved));
+  const speedScale=canvasDragFastForward&&!winnerCinematic?3:1;
   sim.slowTarget=slow;
   sim.slowScale=slow;
-  sim.acc=Math.min(80,Math.max(0,Number(sim.acc)||0)+frameDt*slow);
+  sim.acc=Math.min(32,Math.max(0,Number(sim.acc)||0)+frameDt*slow);
 
   let loops=0;
-  // 렉이 있었다고 수백 tick을 몰아서 처리하지 않는다. 최대 6 step까지만 정상 프레임 복구.
-  while(sim.acc>=physicsStep&&loops<6){
-   step(physicsStep);
-   sim.sharedTick++;
+  // 화면당 최대 3회만 계산하므로 배속을 켜도 CPU 사용량이 폭증하지 않는다.
+  while(sim.acc>=physicsStep&&loops<3){
+   step(physicsStep*speedScale);
+   sim.sharedTick+=speedScale;
    sim.acc-=physicsStep;
    loops++;
-   // 당첨공이 확정된 프레임에는 남은 catch-up 계산을 즉시 중단해 팝업 페인트를 우선한다.
    if(hostWinnerUrgentPaint)break;
   }
-  if(loops>=6)sim.acc=Math.min(sim.acc,physicsStep);
+  if(loops>=3)sim.acc=Math.min(sim.acc,physicsStep);
 
   // 중계 빈도만 유지. 물리속도에는 영향을 주지 않는다.
   const snapshotGap=sim.balls.length>800?150:sim.balls.length>500?115:sim.balls.length>250?75:40;
@@ -2761,14 +2762,14 @@ function advanceFastForwardClock(extraMs){
 function setFastForward(active){
  canvasDragFastForward=!!active;
  if(sim){
-  sim.userSpeedScale=canvasDragFastForward?5:1;
+  sim.userSpeedScale=canvasDragFastForward?3:1;
   sim.acc=Math.min(sim.acc||0,8.333);
   sim.last=performance.now();
   sim.cameraFrameTs=performance.now();
  }
  let badge=$('speed2xBadge');
  if(!badge){
-  badge=document.createElement('div');badge.id='speed2xBadge';badge.textContent='5×';
+  badge=document.createElement('div');badge.id='speed2xBadge';badge.textContent='3×';
   Object.assign(badge.style,{position:'fixed',zIndex:'9999',right:'286px',top:'92px',padding:'7px 12px',borderRadius:'999px',font:'900 18px Pretendard, sans-serif',color:'#fff',background:'rgba(10,12,20,.82)',border:'1px solid rgba(255,255,255,.3)',pointerEvents:'none',opacity:'0',transform:'scale(.9)',transition:'opacity .16s ease, transform .16s ease'});
   document.body.appendChild(badge);
  }
