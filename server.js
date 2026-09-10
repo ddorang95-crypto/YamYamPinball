@@ -40,6 +40,7 @@ function newRoom(code) {
     map: 'wheel',
     status: 'lobby',
     participants: [],
+    recentPinballs: [],
     winMode: 'first',
     winningRanks: [1],
     raceBalls: [],
@@ -64,6 +65,38 @@ function getRoom(code) {
 }
 
 function touch(room) { room.updatedAt = now(); }
+
+function copyParticipants(list) {
+  return (Array.isArray(list) ? list : []).map((p) => ({
+    id: String(p.id || crypto.randomUUID()),
+    name: String(p.name || '').trim(),
+    count: Math.max(1, Number(p.count || 1) | 0),
+    owner: String(p.owner || 'ADMIN'),
+    ownerInitial: String(p.ownerInitial || '')
+  })).filter((p) => p.name);
+}
+
+function saveRecentPinball(room) {
+  const participants = copyParticipants(room.participants);
+  if (!participants.length) return;
+  const signature = participants
+    .map((p) => [p.owner, p.name, p.count].join('\u0001'))
+    .sort()
+    .join('\u0002');
+  const previous = Array.isArray(room.recentPinballs) ? room.recentPinballs : [];
+  const record = {
+    id: crypto.randomUUID(),
+    savedAt: now(),
+    map: room.map,
+    winMode: room.winMode,
+    winningRanks: [...(room.winningRanks || [1])],
+    totalBalls: participants.reduce((sum, p) => sum + p.count, 0),
+    participants,
+    signature
+  };
+  room.recentPinballs = [record, ...previous.filter((item) => item.signature !== signature)].slice(0, 3);
+}
+
 function backToLobby(room) {
   room.status = 'lobby';
   room.raceBalls = [];
@@ -250,6 +283,7 @@ function handleAction(res, data) {
         }
       }
       if (!balls.length) throw new Error('공을 1개 이상 추가해 주세요.');
+      saveRecentPinball(room);
       room.raceBalls = balls;
       room.finishOrder = [];
       room.winners = [];
@@ -307,9 +341,27 @@ function handleAction(res, data) {
       break;
     }
     case 'resetRace': {
-      backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
+      const participants = room.participants;
+      backToLobby(room);
+      room.participants = participants;
+      room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
+    }
+    case 'restoreRecentPinball': {
+      if (room.status === 'running') throw new Error('진행 중인 레이스를 먼저 초기화해 주세요.');
+      const historyId = String(data.historyId || '');
+      const record = (Array.isArray(room.recentPinballs) ? room.recentPinballs : [])
+        .find((item) => item.id === historyId);
+      if (!record) throw new Error('복구할 기록을 찾을 수 없습니다.');
+      backToLobby(room);
+      room.participants = copyParticipants(record.participants);
+      if (['wheel', 'greed', 'cascade', 'maze'].includes(record.map)) room.map = record.map;
+      if (['first', 'last', 'number'].includes(record.winMode)) room.winMode = record.winMode;
+      room.winningRanks = asRanks(record.winningRanks);
+      if (!room.winningRanks.length) room.winningRanks = [1];
+      room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
     }
     case 'clearParticipants': {
+      saveRecentPinball(room);
       backToLobby(room); room.participants = []; room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
     }
     default: throw new Error('지원하지 않는 요청입니다.');
