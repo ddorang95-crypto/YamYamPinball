@@ -41,6 +41,7 @@ function newRoom(code) {
     status: 'lobby',
     participants: [],
     recentPinballs: [],
+    activeRecentPinballId: null,
     winMode: 'first',
     winningRanks: [1],
     raceBalls: [],
@@ -76,6 +77,13 @@ function copyParticipants(list) {
   })).filter((p) => p.name);
 }
 
+function recentPinballTitle(participants) {
+  const names = [...new Set(participants.map((p) => String(p.name || '').trim()).filter(Boolean))];
+  if (!names.length) return '빈 핀볼';
+  const shown = names.slice(0, 3).join(' · ');
+  return names.length > 3 ? `${shown} 외 ${names.length - 3}개` : shown;
+}
+
 function saveRecentPinball(room) {
   const participants = copyParticipants(room.participants);
   if (!participants.length) return;
@@ -84,9 +92,12 @@ function saveRecentPinball(room) {
     .sort()
     .join('\u0002');
   const previous = Array.isArray(room.recentPinballs) ? room.recentPinballs : [];
+  const currentId = String(room.activeRecentPinballId || '');
+  const current = previous.find((item) => item.id === currentId);
   const record = {
-    id: crypto.randomUUID(),
+    id: current ? current.id : crypto.randomUUID(),
     savedAt: now(),
+    title: recentPinballTitle(participants),
     map: room.map,
     winMode: room.winMode,
     winningRanks: [...(room.winningRanks || [1])],
@@ -94,9 +105,9 @@ function saveRecentPinball(room) {
     participants,
     signature
   };
-  room.recentPinballs = [record, ...previous.filter((item) => item.signature !== signature)].slice(0, 3);
+  room.activeRecentPinballId = record.id;
+  room.recentPinballs = [record, ...previous.filter((item) => item.id !== record.id && item.signature !== signature)].slice(0, 3);
 }
-
 function backToLobby(room) {
   room.status = 'lobby';
   room.raceBalls = [];
@@ -172,7 +183,7 @@ function handleAction(res, data) {
       if (!name || name.length > 24) throw new Error('닉네임은 1~24자로 입력해 주세요.');
       if (owner.length > 40) throw new Error('멤버 이름이 너무 깁니다.');
       room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, count, addedAt: now() });
-      backToLobby(room); touch(room); break;
+      backToLobby(room); saveRecentPinball(room); touch(room); break;
     }
     case 'bulkAdd': {
       if (room.status === 'running') throw new Error('레이스 진행 중에는 추가할 수 없습니다.');
@@ -182,7 +193,7 @@ function handleAction(res, data) {
         const count = Math.max(1, Math.min(5000, Number(item.count) || 1));
         if (name && name.length <= 24) room.participants.push({ id: crypto.randomUUID().replace(/-/g, ''), name, owner, count, addedAt: now() });
       }
-      backToLobby(room); touch(room); break;
+      backToLobby(room); saveRecentPinball(room); touch(room); break;
     }
     case 'syncMvpParticipants': {
       if (room.status === 'running') throw new Error('레이스 진행 중에는 MVP를 등록할 수 없습니다.');
@@ -215,7 +226,7 @@ function handleAction(res, data) {
         count: item.count,
         addedAt: now()
       });
-      backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); touch(room);
+      backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); saveRecentPinball(room); touch(room);
       responseState(res, room, {
         imported: merged.size,
         balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0)
@@ -238,7 +249,10 @@ function handleAction(res, data) {
         const kept = room.participants.find((p) => p.id === keepId);
         if (kept) kept.count = target;
       }
-      backToLobby(room); touch(room); break;
+      backToLobby(room);
+      if (room.participants.length) saveRecentPinball(room);
+      else room.activeRecentPinballId = null;
+      touch(room); break;
     }
     case 'setMode': {
       if (!['solo', 'group'].includes(data.mode)) throw new Error('잘못된 모드입니다.');
@@ -354,6 +368,7 @@ function handleAction(res, data) {
       if (!record) throw new Error('복구할 기록을 찾을 수 없습니다.');
       backToLobby(room);
       room.participants = copyParticipants(record.participants);
+      room.activeRecentPinballId = record.id;
       if (['wheel', 'greed', 'cascade', 'maze'].includes(record.map)) room.map = record.map;
       if (['first', 'last', 'number'].includes(record.winMode)) room.winMode = record.winMode;
       room.winningRanks = asRanks(record.winningRanks);
@@ -362,6 +377,7 @@ function handleAction(res, data) {
     }
     case 'clearParticipants': {
       saveRecentPinball(room);
+      room.activeRecentPinballId = null;
       backToLobby(room); room.participants = []; room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
     }
     default: throw new Error('지원하지 않는 요청입니다.');
