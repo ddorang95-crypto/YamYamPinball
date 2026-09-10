@@ -1130,3 +1130,36 @@ body.unified .participantList .personBallCount strong{position:static!important;
  body.unified .actionGroup>*{min-width:0!important}
  body.unified .actionGroup #memberLink{flex:1 0 100%!important;overflow-wrap:anywhere!important}
 }
+
+
+/* v17.13: 중간 폭 창은 입력 영역을 한 줄 전체로 확보 */
+@media (max-width:1450px){
+ body.unified .adminGrid{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  gap:10px!important;
+ }
+ body.unified .mergedEntryGroup{
+  grid-column:1/-1!important;
+  grid-row:1!important;
+  min-width:0!important;
+  width:100%!important;
+ }
+ body.unified .win{
+  grid-column:1!important;
+  grid-row:2!important;
+  min-width:0!important;
+ }
+ body.unified .actionGroup{
+  grid-column:2!important;
+  grid-row:2!important;
+  min-width:0!important;
+ }
+ body.unified button,
+ body.unified .winChoice{white-space:nowrap!important;word-break:keep-all!important}
+}
+@media (max-width:850px){
+ body.unified .adminGrid{grid-template-columns:1fr!important}
+ body.unified .mergedEntryGroup{grid-column:1!important;grid-row:1!important}
+ body.unified .win{grid-column:1!important;grid-row:2!important}
+ body.unified .actionGroup{grid-column:1!important;grid-row:3!important}
+}
