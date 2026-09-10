@@ -1,7 +1,7 @@
 /* 얌얌랜드 공유핀볼 v15.10w 모든맵 공통 핀볼셋팅 기본화 - v14.3 검증 렌더러 기반 - 화면 확대·공 가독성 강화 */
 'use strict';
 const YamyamApp=(()=>{
-const qs=new URLSearchParams(location.search),room=(qs.get('room')||'YAMYAM').replace(/[^A-Za-z0-9_-]/g,'').toUpperCase();
+const qs=new URLSearchParams(location.search),room=(qs.get('room')||'GROUP').replace(/[^A-Za-z0-9_-]/g,'').toUpperCase();
 let role='display',unifiedMode=false,eventSource=null,state=null,owner='',sim=null,lastRace=-1,polling=false,lastRankCount=-1,lastWinnerRace=-1,pendingWinMode=null,mutationBusy=false,winDraft=null,winSaveTimer=0,winSaveInFlight=false,winSaveQueued=false,localRunning=false,localRaceConfig=null,manualCam=null,snapshotInFlight=false,connectionFailures=0,resetInFlight=false,lifecycleEpoch=0,pendingMap=null,selectedMapLock=null,serverStateSuppressedUntil=0,lastRenderErrorAt=0,remoteBallView=new Map(),lastRemoteFrameTs=0,nameHueMap=new Map(),nextNameHueIndex=0,nameColorSignature='',winnerPopupFirstSeenAt=0,mapChangeToken=0,canvasDragFastForward=false,suppressNextCanvasClick=false,raceHostId=null,snapshotSeq=0,lastAcceptedSnapshotSeq=0,remoteSnapshotReceivedAt=0,sharedPointer=null,interactionSeq=0,snapshotSocket=null,snapshotSocketReady=false,snapshotSocketRetry=0,remoteFrameBuffer=[],renderRemoteSnapshot=null,remotePlaybackDelayMs=0;
 const $=id=>document.getElementById(id),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ADMIN_PREFS_KEY='yamyam_pinball_admin_prefs_'+room;
@@ -499,7 +499,7 @@ $('clearBtn').onclick=async()=>{
 }
 function flash(t){const m=$('msg');if(!m)return;m.textContent=t;setTimeout(()=>{if(m.textContent===t)m.textContent=''},1800)}
 function bindMember(){owner=localStorage.getItem('pin_owner')||'';$('ownerInput').value=owner;$('saveOwner').onclick=()=>{owner=$('ownerInput').value.trim();localStorage.setItem('pin_owner',owner);flash('저장 완료')};$('addBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('addParticipant',{name:$('nameInput').value,count:+$('countInput').value||1,owner}).then(()=>{$('nameInput').value=''})};$('bulkBtn').onclick=()=>{owner=$('ownerInput').value.trim();if(owner)api('bulkAdd',{items:parseBulk($('bulkInput').value),owner}).then(()=>{$('bulkInput').value=''})}}
-function ownerMark(value){const raw=String(value||'').trim(),v=raw.toLowerCase();if(v.includes('야미')||v==='y'||v.includes('yami'))return'얌';if(v.includes('꿀혜')||v==='g'||v.includes('ggul'))return'꿀';if(v.includes('선하')||v==='m'||v.includes('seonha'))return'선';if(v.includes('도릿')||v==='d'||v.includes('dorit'))return'도';return raw.slice(0,1).toUpperCase()||'?'}
+function ownerMark(value){const raw=String(value||'').trim(),v=raw.toLowerCase();if(v.includes('야미')||v==='y'||v.includes('yami'))return'얌';if(v.includes('선하')||v==='m'||v.includes('seonha'))return'선';if(v.includes('도릿')||v==='d'||v.includes('dorit'))return'도';return raw.slice(0,1).toUpperCase()||'?'}
 
 let hostWinnerUrgentPaint=false;
 function showHostWinnerPopupNow(winner){
