@@ -300,7 +300,7 @@ function handleAction(res, data) {
 }
 
 function serveStatic(req, res, pathname) {
-  let rel = pathname === '/' ? 'admin.html' : pathname.replace(/^\/+/, '');
+  let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   try { rel = decodeURIComponent(rel); } catch { return text(res, 400, 'Bad request'); }
   const full = path.resolve(ROOT, rel);
   if (!full.startsWith(ROOT + path.sep) && full !== ROOT) return text(res, 403, 'Forbidden');
