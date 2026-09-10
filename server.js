@@ -360,6 +360,14 @@ function handleAction(res, data) {
       room.participants = participants;
       room.shuffleNonce += 1; room.seed = randomSeed(); touch(room); break;
     }
+    case 'deleteRecentPinball': {
+      const historyId = String(data.historyId || '');
+      const before = Array.isArray(room.recentPinballs) ? room.recentPinballs : [];
+      if (!before.some((item) => item.id === historyId)) throw new Error('삭제할 저장 세트를 찾을 수 없습니다.');
+      room.recentPinballs = before.filter((item) => item.id !== historyId);
+      if (room.activeRecentPinballId === historyId) room.activeRecentPinballId = null;
+      touch(room); break;
+    }
     case 'restoreRecentPinball': {
       if (room.status === 'running') throw new Error('진행 중인 레이스를 먼저 초기화해 주세요.');
       const historyId = String(data.historyId || '');
