@@ -578,7 +578,7 @@ function ui(){if(!state)return;refreshNameColors();if($('brand'))$('brand').text
   recentButtons.innerHTML=recent.length?recent.map((item,index)=>{
    const fallback=(item.participants||[]).map(p=>p.name).filter(Boolean).slice(0,3).join(' · ')||('최근 핀볼 '+(index+1));
    const label=item.title||fallback;
-   return '<button type="button" class="recentSetBtn" data-history-id="'+esc(item.id)+'" title="'+esc(label)+' · '+Number(item.totalBalls||0)+'공"><span>'+(index+1)+'</span><b>'+esc(label)+'</b><small>'+Number(item.totalBalls||0)+'공</small></button>'
+   return '<div class="recentSetItem"><button type="button" class="recentSetBtn" data-history-id="'+esc(item.id)+'" title="'+esc(label)+' · '+Number(item.totalBalls||0)+'공"><span>'+(index+1)+'</span><b>'+esc(label)+'</b><small>'+Number(item.totalBalls||0)+'공</small></button><button type="button" class="recentDeleteBtn" data-history-id="'+esc(item.id)+'" aria-label="'+esc(label)+' 저장 세트 삭제" title="이 저장 세트 삭제">×</button></div>'
   }).join(''):'<span class="recentEmpty">아직 자동 저장된 핀볼이 없어요</span>';
   recentButtons.querySelectorAll('.recentSetBtn').forEach(btn=>btn.onclick=async()=>{
    const historyId=btn.dataset.historyId||'';
@@ -592,6 +592,17 @@ function ui(){if(!state)return;refreshNameColors();if($('brand'))$('brand').text
     winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
     ui();flash('저장된 핀볼 구성을 그대로 불러왔어요');
    }catch(e){flash('구성 불러오기 실패: '+(e?.message||'통신 오류'))}
+  });
+  recentButtons.querySelectorAll('.recentDeleteBtn').forEach(btn=>btn.onclick=async()=>{
+   const historyId=btn.dataset.historyId||'';
+   const label=btn.previousElementSibling?.querySelector('b')?.textContent||'이 핀볼';
+   if(!historyId||!confirm('「'+label+'」 저장 세트만 삭제할까요?\n현재 참가자 명단은 삭제되지 않아요'))return;
+   try{
+    const j=await apiQuiet('deleteRecentPinball',{historyId},8000);
+    if(!j?.ok)throw Error(j?.error||'삭제 오류');
+    if(j.state)state=j.state;
+    ui();flash('저장된 핀볼 세트만 삭제했어요');
+   }catch(e){flash('저장 세트 삭제 실패: '+(e?.message||'통신 오류'))}
   });
  }
  if($('soloBtn'))$('soloBtn').classList.toggle('selected',state.mode==='solo');if($('groupBtn'))$('groupBtn').classList.toggle('selected',state.mode==='group');document.querySelectorAll('.winChoice').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));if($('winSaved')&&!pendingWinMode){const wt=shownMode==='first'?'당첨: 첫 번째':shownMode==='last'?'당첨: 마지막':'당첨: '+shownRanks.join(', ')+'번째';$('winSaved').textContent='현재 설정: '+wt}}
