@@ -477,22 +477,6 @@ function bindAdmin(){
   finally{mutationBusy=false;resetInFlight=false;if(btn){btn.disabled=false;btn.textContent='경기 초기화'}}
 };
 
-if($('recentPinSelect'))$('recentPinSelect').onchange=()=>{if($('restoreRecentBtn'))$('restoreRecentBtn').disabled=!$('recentPinSelect').value};
-if($('restoreRecentBtn'))$('restoreRecentBtn').onclick=async()=>{
- const historyId=$('recentPinSelect')?.value||'';
- if(!historyId){flash('복구할 최근 핀볼을 선택해 주세요');return}
- if(!confirm('선택한 핀볼 참가자 명단으로 복구할까요?'))return;
- try{
-  const j=await apiQuiet('restoreRecentPinball',{historyId},8000);
-  if(!j?.ok)throw Error(j?.error||'복구 오류');
-  cancelSyncStart();stopStartCountdown();stopLocalRace({clearParticipants:false});
-  if(j.state)state=j.state;
-  selectedMapLock=state.map;pendingMap=null;
-  winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
-  ui();flash('최근 핀볼 참가자 명단을 복구했어요');
- }catch(e){flash('명단 복구 실패: '+(e?.message||'통신 오류'))}
-};
-
 $('clearBtn').onclick=async()=>{
  if(resetInFlight||!confirm('참가자를 전체 삭제할까요?'))return;
  resetInFlight=true;mutationBusy=true;
@@ -589,12 +573,26 @@ const mapNames={wheel:'🍭 캔디 수레바퀴',greed:'🏺 욕망의 항아리
 function ui(){if(!state)return;refreshNameColors();if($('brand'))$('brand').textContent=state.title;if($('roomCode'))$('roomCode').textContent=state.code;if($('ballCount'))$('ballCount').textContent=balls().length;const modeText=state.mode==='solo'?'개인 핀볼':'단체 핀볼';if($('modeLabel'))$('modeLabel').textContent=modeText;if($('modeBadge')){$('modeBadge').textContent=modeText;$('modeBadge').className=state.mode==='solo'?'solo':'group'};if($('mapBadge'))$('mapBadge').textContent=mapNames[state.map]||state.map;const winText=state.winMode==='first'?'당첨: 첫 번째':state.winMode==='last'?'당첨: 마지막':'당첨: '+(state.winningRanks||[1]).join(', ')+'번째';if($('winBadge'))$('winBadge').textContent=winText;
  if(role==='admin'){if($('titleInput'))$('titleInput').value=state.title;const fixedMap=selectedMapLock||pendingMap||state.map;selectedMapLock=mapNames[fixedMap]?fixedMap:(selectedMapLock||'wheel');$('mapSelect').value=selectedMapLock;$('mapSelect').disabled=false;const shownMode=pendingWinMode||(winDraft?.mode)||state.winMode||'first';const shownRanks=shownMode==='last'?[Math.max(1,balls().length)]:((winDraft?.ranks)||state.winningRanks||[1]);const wr=document.querySelector(`input[name=win][value=${shownMode}]`);if(wr)wr.checked=true;if(!pendingWinMode)$('rankNumber').value=shownRanks.join(',');$('rankNumber').disabled=shownMode!=='number';$('memberLink').textContent=location.origin+'/member.html?room='+state.code;
  const recent=Array.isArray(state.recentPinballs)?state.recentPinballs:[];
- const recentSelect=$('recentPinSelect');
- if(recentSelect){
-  const selected=recentSelect.value;
-  recentSelect.innerHTML='<option value="">최근 핀볼 복구</option>'+recent.map((item,index)=>{const d=new Date(Number(item.savedAt)||Date.now());const time=d.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});return '<option value="'+esc(item.id)+'">최근 '+(index+1)+' · '+esc(time)+' · '+Number(item.totalBalls||0)+'공</option>'}).join('');
-  if(recent.some(item=>item.id===selected))recentSelect.value=selected;
-  if($('restoreRecentBtn'))$('restoreRecentBtn').disabled=!recent.length;
+ const recentButtons=$('recentSetButtons');
+ if(recentButtons){
+  recentButtons.innerHTML=recent.length?recent.map((item,index)=>{
+   const fallback=(item.participants||[]).map(p=>p.name).filter(Boolean).slice(0,3).join(' · ')||('최근 핀볼 '+(index+1));
+   const label=item.title||fallback;
+   return '<button type="button" class="recentSetBtn" data-history-id="'+esc(item.id)+'" title="'+esc(label)+' · '+Number(item.totalBalls||0)+'공"><span>'+(index+1)+'</span><b>'+esc(label)+'</b><small>'+Number(item.totalBalls||0)+'공</small></button>'
+  }).join(''):'<span class="recentEmpty">아직 자동 저장된 핀볼이 없어요</span>';
+  recentButtons.querySelectorAll('.recentSetBtn').forEach(btn=>btn.onclick=async()=>{
+   const historyId=btn.dataset.historyId||'';
+   if(!historyId||!confirm('「'+(btn.querySelector('b')?.textContent||'선택한 핀볼')+'」 구성을 불러올까요?'))return;
+   try{
+    const j=await apiQuiet('restoreRecentPinball',{historyId},8000);
+    if(!j?.ok)throw Error(j?.error||'복구 오류');
+    cancelSyncStart();stopStartCountdown();stopLocalRace({clearParticipants:false});
+    if(j.state)state=j.state;
+    selectedMapLock=state.map;pendingMap=null;
+    winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
+    ui();flash('저장된 핀볼 구성을 그대로 불러왔어요');
+   }catch(e){flash('구성 불러오기 실패: '+(e?.message||'통신 오류'))}
+  });
  }
  if($('soloBtn'))$('soloBtn').classList.toggle('selected',state.mode==='solo');if($('groupBtn'))$('groupBtn').classList.toggle('selected',state.mode==='group');document.querySelectorAll('.winChoice').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));if($('winSaved')&&!pendingWinMode){const wt=shownMode==='first'?'당첨: 첫 번째':shownMode==='last'?'당첨: 마지막':'당첨: '+shownRanks.join(', ')+'번째';$('winSaved').textContent='현재 설정: '+wt}}
  if($('participants')){const l=(role==='member'&&!unifiedMode)?(state.participants||[]).filter(p=>p.owner===owner):(state.participants||[]),groups=new Map();for(const p of l){const key=(p.owner||'')+'\u0000'+p.name;const g=groups.get(key)||{name:p.name,owner:p.owner,ownerInitial:ownerMark(p.owner||p.ownerInitial),total:0,ids:[]};g.total+=Number(p.count)||0;g.ids.push(p.id);if(!g.ownerInitial)g.ownerInitial=ownerMark(p.owner||p.ownerInitial);groups.set(key,g)}const rows=[...groups.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ko'));$('participants').innerHTML=rows.length?rows.map((g,i)=>`<div class=pitem style="--personColor:${getNameColor(g.name,1)};--personSoft:${getNameColor(g.name,.13)}"><span class=personRank>${i+1}</span><span class=colorDot style="--dot:${getNameColor(g.name,1)}"></span><span class=ownerInitialBadge title="${esc(g.owner||'입력자')}">${esc(ownerMark(g.owner||g.ownerInitial))}</span><b class=participantName title="${esc(g.name)}">${esc(g.name)}</b><div class=ballAdjust data-ids="${g.ids.join(',')}"><button class=countMinus type=button aria-label="공 1개 빼기">−</button><span class=personBallCount><strong>${g.total}</strong><small>개</small></span><button class=countPlus type=button aria-label="공 1개 추가">＋</button><button class=countSet type=button>갯수 조정</button></div></div>`).join(''):'<div class=emptyParticipants>추가된 참가자가 없습니다</div>';if($('participantSummary'))$('participantSummary').textContent=`${rows.length}명 · 총 ${rows.reduce((n,g)=>n+g.total,0)}공`;document.querySelectorAll('.ballAdjust').forEach(box=>{const ids=box.dataset.ids.split(',').filter(Boolean),current=Number(box.querySelector('.personBallCount strong')?.textContent)||0;box.querySelector('.countMinus').onclick=async()=>{if(current<=1&&!confirm('이 참가자의 마지막 공까지 뺄까요?'))return;try{await api('adjustParticipantGroup',{ids,delta:-1,owner,admin:role==='admin'})}catch(e){flash(e.message||'개수 변경 실패')}};box.querySelector('.countPlus').onclick=async()=>{try{await api('adjustParticipantGroup',{ids,delta:1,owner,admin:role==='admin'})}catch(e){flash(e.message||'개수 변경 실패')}};box.querySelector('.countSet').onclick=()=>{const raw=prompt('변경할 전체 공 개수를 입력해주세요. (0 입력 시 참가자 삭제)',String(current));if(raw===null)return;const count=Number(raw);if(!Number.isInteger(count)||count<0||count>5000){flash('0~5000 사이의 정수를 입력해주세요');return}if(count===0&&!confirm('이 참가자를 삭제할까요?'))return;api('adjustParticipantGroup',{ids,count,owner,admin:role==='admin'}).catch(e=>flash(e.message||'개수 변경 실패'))}})}
