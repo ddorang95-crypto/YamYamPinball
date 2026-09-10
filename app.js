@@ -2112,7 +2112,7 @@ function drawFrame(ts){const c=$('raceCanvas');if(!c)return;const sourceCount=(i
     return;
   }
  }
- const mh=map.worldH||H,renderBaseScale=Math.min((w-250)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
+ const mh=map.worldH||H,responsiveSideReserve=clamp(60+(w-900)*.6,60,250),renderBaseScale=Math.min((w-responsiveSideReserve)/W,1.02),bottomViewWorld=h/Math.max(.01,renderBaseScale*.86),bottomFixedCam=clamp((map.gate?.pivotY||map.finalZone?.gateY||mh-500)-bottomViewWorld*.49,0,Math.max(0,mh-bottomViewWorld+40));let active=source.filter(b=>!b.done),ys=active.map(b=>b.y).sort((a,b)=>a-b);
  const q=(r)=>ys.length?ys[Math.min(ys.length-1,Math.floor((ys.length-1)*r))]:mh-200;
  // 현재 목표 당첨 순번까지의 진행률. 예: 목표 55번, 현재 30번이면 약 55% 진행.
  let cameraNextRank=sim?.finish?.length?sim.finish.length+1:1,cameraTargetRank=0,cameraProgress=0;
