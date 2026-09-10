@@ -50,6 +50,7 @@ function newRoom(code) {
     seed: 1,
     shuffleNonce: 0,
     winnerDeclared: false,
+    raceHostId: null,
     startedAt: 0,
     duration: 0,
     updatedAt: now()
@@ -70,6 +71,7 @@ function backToLobby(room) {
   room.winners = [];
   room.winnerDeclared = false;
   room.snapshot = emptySnapshot();
+  room.raceHostId = null;
   room.startedAt = 0;
   room.duration = 0;
 }
@@ -83,9 +85,7 @@ function json(res, status, value) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': body.length,
-    'Cache-Control': 'no-store, no-cache, must-revalidate',
-    'Access-Control-Allow-Origin': 'https://yamyam-gauge.ddorang95.chatgpt.site',
-    'Vary': 'Origin'
+    'Cache-Control': 'no-store, no-cache, must-revalidate'
   });
   res.end(body);
 }
@@ -95,9 +95,7 @@ function text(res, status, value, type = 'text/plain; charset=utf-8') {
   res.writeHead(status, {
     'Content-Type': type,
     'Content-Length': body.length,
-    'Cache-Control': 'no-store, no-cache, must-revalidate',
-    'Access-Control-Allow-Origin': 'https://yamyam-gauge.ddorang95.chatgpt.site',
-    'Vary': 'Origin'
+    'Cache-Control': 'no-store, no-cache, must-revalidate'
   });
   res.end(body);
 }
@@ -154,37 +152,25 @@ function handleAction(res, data) {
       const merged = new Map();
       for (const item of Array.isArray(data.items) ? data.items : []) {
         const name = String(item && item.name || '').trim().slice(0, 24);
-        const owner = String(item && item.owner || '').trim().slice(0, 40);
         const count = Math.floor(Number(item && item.count));
-        if (!name || !owner || !Number.isInteger(count) || count < 1 || count > 5000) continue;
-        const key = owner.normalize('NFKC').toLocaleLowerCase('ko-KR') + '\\u0000' +
-          name.normalize('NFKC').toLocaleLowerCase('ko-KR');
-        const current = merged.get(key) || { name, owner, count: 0 };
+        if (!name || !Number.isInteger(count) || count < 1 || count > 5000) continue;
+        const key = name.normalize('NFKC').toLocaleLowerCase('ko-KR');
+        const current = merged.get(key) || { name, count: 0 };
         current.name = name;
-        current.owner = owner;
         current.count = Math.min(5000, current.count + count);
         merged.set(key, current);
       }
       if (!merged.size) throw new Error('등록할 10만원 이상 후원자가 없습니다.');
-      const importedKeys = new Set(merged.keys());
+      const importedNames = new Set(merged.keys());
       room.participants = room.participants.filter((participant) => {
-        const key = String(participant.owner || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR') + '\\u0000' +
-          String(participant.name || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR');
-        return participant.source !== 'MVP_AUTO' && !importedKeys.has(key);
+        const key = String(participant.name || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR');
+        return participant.owner !== 'MVP_AUTO' && !importedNames.has(key);
       });
       for (const item of merged.values()) room.participants.push({
-        id: crypto.randomUUID().replace(/-/g, ''),
-        name: item.name,
-        owner: item.owner,
-        source: 'MVP_AUTO',
-        count: item.count,
-        addedAt: now()
+        id: crypto.randomUUID().replace(/-/g, ''), name: item.name, owner: 'MVP_AUTO', count: item.count, addedAt: now()
       });
       backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); touch(room);
-      responseState(res, room, {
-        imported: merged.size,
-        balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0)
-      });
+      responseState(res, room, { imported: merged.size, balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0) });
       return;
     }
     case 'adjustParticipantGroup': {
@@ -257,9 +243,10 @@ function handleAction(res, data) {
       if (!(room.seed > 0)) room.seed = randomSeed();
       room.startedAt = now() + 250;
       room.duration = 0;
+      room.raceHostId = String(data.clientId || '').trim() || null;
       room.status = 'running';
       touch(room);
-      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, winMode: room.winMode, winningRanks: room.winningRanks });
+      json(res, 200, { ok: true, raceId: room.raceId, seed: room.seed, status: room.status, map: room.map, raceHostId: room.raceHostId, winMode: room.winMode, winningRanks: room.winningRanks });
       return;
     }
     case 'snapshot': {
@@ -316,7 +303,7 @@ function handleAction(res, data) {
 }
 
 function serveStatic(req, res, pathname) {
-  let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  let rel = pathname === '/' ? 'admin.html' : pathname.replace(/^\/+/, '');
   try { rel = decodeURIComponent(rel); } catch { return text(res, 400, 'Bad request'); }
   const full = path.resolve(ROOT, rel);
   if (!full.startsWith(ROOT + path.sep) && full !== ROOT) return text(res, 403, 'Forbidden');
@@ -331,16 +318,6 @@ function serveStatic(req, res, pathname) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204, {
-        'Access-Control-Allow-Origin': 'https://yamyam-gauge.ddorang95.chatgpt.site',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Max-Age': '86400',
-        'Vary': 'Origin'
-      });
-      return res.end();
-    }
     if (url.pathname === '/health') return json(res, 200, { ok: true });
     if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: getRoom(url.searchParams.get('room')) });
     if (url.pathname === '/api/action' && req.method === 'POST') {
