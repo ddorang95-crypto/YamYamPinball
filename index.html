@@ -3,7 +3,6 @@
 <nav class="roomTabs" aria-label="핀볼 화면 선택">
 <a data-room="GROUP" href="?room=GROUP">단체 핀볼</a>
 <a data-room="YAMI" href="?room=YAMI">야미</a>
-<a data-room="GGULHYE" href="?room=GGULHYE">꿀혜</a>
 <a data-room="SEONHA" href="?room=SEONHA">선하</a>
 <a data-room="DORIT" href="?room=DORIT">도릿</a>
 </nav>
@@ -27,7 +26,7 @@
 (()=>{
  const params=new URLSearchParams(location.search);
  const room=(params.get('room')||'GROUP').toUpperCase();
- const names={GROUP:'단체 핀볼',YAMI:'야미',GGULHYE:'꿀혜',SEONHA:'선하',DORIT:'도릿'};
+ const names={GROUP:'단체 핀볼',YAMI:'야미',SEONHA:'선하',DORIT:'도릿'};
  document.querySelectorAll('.roomTabs a').forEach(a=>a.classList.toggle('active',a.dataset.room===room));
  const label=document.getElementById('roomDisplayName');if(label)label.textContent=names[room]||room;
  document.title=`${names[room]||room} · 얌얌랜드 핀볼`;
