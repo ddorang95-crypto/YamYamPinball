@@ -154,25 +154,37 @@ function handleAction(res, data) {
       const merged = new Map();
       for (const item of Array.isArray(data.items) ? data.items : []) {
         const name = String(item && item.name || '').trim().slice(0, 24);
+        const owner = String(item && item.owner || '').trim().slice(0, 40);
         const count = Math.floor(Number(item && item.count));
-        if (!name || !Number.isInteger(count) || count < 1 || count > 5000) continue;
-        const key = name.normalize('NFKC').toLocaleLowerCase('ko-KR');
-        const current = merged.get(key) || { name, count: 0 };
+        if (!name || !owner || !Number.isInteger(count) || count < 1 || count > 5000) continue;
+        const key = owner.normalize('NFKC').toLocaleLowerCase('ko-KR') + '\\u0000' +
+          name.normalize('NFKC').toLocaleLowerCase('ko-KR');
+        const current = merged.get(key) || { name, owner, count: 0 };
         current.name = name;
+        current.owner = owner;
         current.count = Math.min(5000, current.count + count);
         merged.set(key, current);
       }
       if (!merged.size) throw new Error('등록할 10만원 이상 후원자가 없습니다.');
-      const importedNames = new Set(merged.keys());
+      const importedKeys = new Set(merged.keys());
       room.participants = room.participants.filter((participant) => {
-        const key = String(participant.name || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR');
-        return participant.owner !== 'MVP_AUTO' && !importedNames.has(key);
+        const key = String(participant.owner || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR') + '\\u0000' +
+          String(participant.name || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR');
+        return participant.source !== 'MVP_AUTO' && !importedKeys.has(key);
       });
       for (const item of merged.values()) room.participants.push({
-        id: crypto.randomUUID().replace(/-/g, ''), name: item.name, owner: 'MVP_AUTO', count: item.count, addedAt: now()
+        id: crypto.randomUUID().replace(/-/g, ''),
+        name: item.name,
+        owner: item.owner,
+        source: 'MVP_AUTO',
+        count: item.count,
+        addedAt: now()
       });
       backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); touch(room);
-      responseState(res, room, { imported: merged.size, balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0) });
+      responseState(res, room, {
+        imported: merged.size,
+        balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0)
+      });
       return;
     }
     case 'adjustParticipantGroup': {
