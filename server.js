@@ -83,7 +83,9 @@ function json(res, status, value) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': body.length,
-    'Cache-Control': 'no-store, no-cache, must-revalidate'
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Access-Control-Allow-Origin': 'https://yamyam-gauge.ddorang95.chatgpt.site',
+    'Vary': 'Origin'
   });
   res.end(body);
 }
@@ -93,7 +95,9 @@ function text(res, status, value, type = 'text/plain; charset=utf-8') {
   res.writeHead(status, {
     'Content-Type': type,
     'Content-Length': body.length,
-    'Cache-Control': 'no-store, no-cache, must-revalidate'
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Access-Control-Allow-Origin': 'https://yamyam-gauge.ddorang95.chatgpt.site',
+    'Vary': 'Origin'
   });
   res.end(body);
 }
@@ -315,6 +319,16 @@ function serveStatic(req, res, pathname) {
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': 'https://yamyam-gauge.ddorang95.chatgpt.site',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '86400',
+        'Vary': 'Origin'
+      });
+      return res.end();
+    }
     if (url.pathname === '/health') return json(res, 200, { ok: true });
     if (url.pathname === '/api/state' && req.method === 'GET') return json(res, 200, { ok: true, state: getRoom(url.searchParams.get('room')) });
     if (url.pathname === '/api/action' && req.method === 'POST') {
