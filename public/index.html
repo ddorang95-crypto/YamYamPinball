@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>얌얌랜드 마블 핀볼 LIVE</title><link rel="stylesheet" href="styles.css?v=17071"></head>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>얌얌랜드 마블 핀볼 LIVE</title><link rel="stylesheet" href="styles.css?v=17072"></head>
 <body class="unified"><header><b id="brand">얌얌랜드 마블 핀볼</b><span><b id="roomDisplayName">단체 핀볼</b> · <i id="conn">연결 중</i></span></header>
 <nav class="roomTabs" aria-label="핀볼 화면 선택">
 <a data-room="GROUP" href="?room=GROUP">단체 핀볼</a>
@@ -17,12 +17,12 @@
       <textarea id="bulkInput" placeholder="여러 명을 쉼표나 엔터로 구분"></textarea><button id="bulkBtn" type="button">일괄 추가</button><button id="shuffleBtn" class="shuffle" type="button">섞기</button>
     </div>
     <div class="group win"><b>당첨 기준</b><label class="winChoice"><input type="radio" name="win" value="first"> 첫 번째</label><label class="winChoice"><input type="radio" name="win" value="last"> 마지막</label><label class="winChoice"><input type="radio" name="win" value="number"> 숫자 선택</label><input id="rankNumber" value="3" placeholder="예: 3 또는 1,5,10"><button id="applyWin">적용</button><span id="winSaved">설정 저장 전</span></div>
-    <div class="group actionGroup"><select id="mapSelect"><option value="wheel">🍭 캔디 수레바퀴</option><option value="greed">🏺 욕망의 항아리 REMIX</option></select><button id="startBtn" class="primary">▶ 레이스 시작</button><button id="resetBtn">경기 초기화</button><button id="clearBtn" class="danger">참가자 전체 삭제</button><b>총 <span id="ballCount">0</span>공</b><div class="recentRestore"><select id="recentPinSelect" aria-label="최근 핀볼 선택"><option value="">최근 핀볼 복구</option></select><button id="restoreRecentBtn" type="button" disabled>불러오기</button></div><small id="memberLink"></small></div>
+    <div class="group actionGroup"><select id="mapSelect"><option value="wheel">🍭 캔디 수레바퀴</option><option value="greed">🏺 욕망의 항아리 REMIX</option></select><button id="startBtn" class="primary">▶ 레이스 시작</button><button id="resetBtn">경기 초기화</button><button id="clearBtn" class="danger">참가자 전체 삭제</button><b>총 <span id="ballCount">0</span>공</b><div class="recentRestore" id="recentSetButtons" aria-label="자동 저장된 핀볼 세트"><span class="recentEmpty">저장된 핀볼 없음</span></div><small id="memberLink"></small></div>
   </div>
   <div class="participantBoard"><div class="participantBoardTitle"><b>현재 참가자</b><strong id="participantSummary">0명 · 총 0공</strong></div><div class="list participantList" id="participants"></div></div>
   <small id="msg"></small>
 </section>
-</main><script src="app.js?v=17070"></script><script>
+</main><script src="app.js?v=17072"></script><script>
 (()=>{
  const params=new URLSearchParams(location.search);
  const room=(params.get('room')||'GROUP').toUpperCase();
