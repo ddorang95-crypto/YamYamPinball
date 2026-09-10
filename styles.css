@@ -1092,3 +1092,41 @@ body.unified .participantList .personBallCount{
 }
 .admin .participantList .personBallCount strong,
 body.unified .participantList .personBallCount strong{position:static!important;margin:0!important}
+
+
+/* v17.12: 좁은 창에서도 관리 UI가 찌그러지지 않도록 재배치 */
+@media (max-width:1100px){
+ body.unified .adminGrid{
+  grid-template-columns:1fr!important;
+  gap:10px!important;
+ }
+ body.unified .mergedEntryGroup,
+ body.unified .win,
+ body.unified .actionGroup{min-width:0!important;width:100%!important}
+ body.unified button,
+ body.unified .winChoice{white-space:nowrap!important;word-break:keep-all!important}
+}
+@media (max-width:700px){
+ body.unified .unifiedBottom{padding:10px!important}
+ body.unified .mergedEntryGroup{
+  grid-template-columns:minmax(0,1fr) 86px!important;
+  gap:7px!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{grid-column:1/-1!important}
+ body.unified .mergedEntryGroup #ownerInput{grid-column:1!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:2!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:1!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:2!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:1/-1!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1!important;height:46px!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:2!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:1/-1!important}
+ body.unified .win{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ body.unified .win>b,
+ body.unified .win #winSaved{grid-column:1/-1!important}
+ body.unified .winChoice{min-width:0!important;padding:10px 8px!important}
+ body.unified #rankNumber{min-width:0!important;width:100%!important}
+ body.unified .actionGroup{display:flex!important;flex-wrap:wrap!important}
+ body.unified .actionGroup>*{min-width:0!important}
+ body.unified .actionGroup #memberLink{flex:1 0 100%!important;overflow-wrap:anywhere!important}
+}
