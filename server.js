@@ -211,7 +211,6 @@ function handleAction(res, data) {
         current.count = Math.min(5000, current.count + count);
         merged.set(key, current);
       }
-      if (!merged.size) throw new Error('등록할 10만원 이상 후원자가 없습니다.');
       const importedKeys = new Set(merged.keys());
       room.participants = room.participants.filter((participant) => {
         const key = String(participant.owner || '').normalize('NFKC').trim().toLocaleLowerCase('ko-KR') + '\\u0000' +
@@ -229,7 +228,8 @@ function handleAction(res, data) {
       backToLobby(room); room.shuffleNonce += 1; room.seed = randomSeed(); saveRecentPinball(room); touch(room);
       responseState(res, room, {
         imported: merged.size,
-        balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0)
+        balls: [...merged.values()].reduce((sum, item) => sum + item.count, 0),
+        cleared: merged.size === 0
       });
       return;
     }
