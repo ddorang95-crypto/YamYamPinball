@@ -1442,3 +1442,392 @@ body.unified .mergedEntryGroup #shuffleBtn{
   white-space:nowrap!important;
  }
 }
+
+
+/* v17.18: 최근 3회 핀볼 명단 복구 */
+body.unified .recentRestore{
+ display:grid;
+ grid-template-columns:minmax(0,1fr) 92px;
+ gap:8px;
+ min-width:0;
+}
+body.unified .recentRestore select,
+body.unified .recentRestore button{
+ box-sizing:border-box;
+ width:100%;
+ height:44px;
+ min-height:44px;
+ margin:0;
+ border-radius:9px;
+}
+@media (min-width:1051px){
+ body.unified .actionGroup{grid-template-rows:44px 44px 44px auto!important}
+ body.unified .actionGroup .recentRestore{grid-column:1/-1!important;grid-row:3!important}
+ body.unified .actionGroup #memberLink{grid-row:4!important}
+}
+@media (min-width:701px) and (max-width:1050px){
+ body.unified .actionGroup .recentRestore{flex:1 0 100%!important;width:100%!important}
+}
+@media (max-width:700px){
+ body.unified .actionGroup .recentRestore{flex:1 0 100%!important;width:100%!important}
+}
+
+
+/* v17.19: 가로·세로 창 모두 compact한 3분류 관리자 UI */
+@media (min-width:1051px){
+ body.unified .adminGrid{
+  grid-template-columns:minmax(600px,1.32fr) minmax(390px,.92fr) minmax(430px,1fr)!important;
+  gap:10px!important;
+  align-items:stretch!important;
+ }
+ body.unified .mergedEntryGroup{
+  grid-column:1!important;
+  grid-row:1!important;
+  grid-template-columns:96px 86px minmax(170px,1fr) 76px 96px!important;
+  grid-template-rows:20px 44px 44px!important;
+  padding:10px!important;
+  gap:7px!important;
+  align-content:start!important;
+ }
+ body.unified .mergedEntryGroup #nameInput,
+ body.unified .mergedEntryGroup #bulkInput{
+  width:100%!important;
+  max-width:none!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:1!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:2!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:3!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:4!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:5!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/4!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:4!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:5!important;grid-row:3!important;width:100%!important;min-width:0!important}
+}
+
+/* 폭이 좁은 창: 참가자 입력을 2줄로 압축하고 세 분류가 빨리 보이게 함 */
+@media (max-width:1050px){
+ body.unified .stage{
+  height:clamp(390px,44vh,500px)!important;
+  min-height:390px!important;
+ }
+ body.unified .unifiedBottom{padding:8px!important}
+ body.unified .adminGrid{gap:7px!important}
+ body.unified .adminGrid .group{padding:8px!important}
+ body.unified .adminGrid input,
+ body.unified .adminGrid textarea,
+ body.unified .adminGrid select,
+ body.unified .adminGrid button,
+ body.unified .adminGrid .winChoice{
+  height:38px!important;
+  min-height:38px!important;
+  border-radius:8px!important;
+ }
+ body.unified .mergedEntryGroup{
+  display:grid!important;
+  grid-template-columns:82px 92px 82px minmax(150px,1fr) 70px 92px 70px!important;
+  grid-template-rows:38px 38px!important;
+  gap:6px!important;
+  align-items:center!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  font-size:15px!important;
+  white-space:nowrap!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:2!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:4!important;grid-row:1!important;width:100%!important;max-width:none!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:5!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:6/8!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/6!important;grid-row:2!important;width:100%!important;max-width:none!important;height:38px!important;resize:none!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:6!important;grid-row:2!important;width:100%!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:7!important;grid-row:2!important;width:100%!important;min-width:0!important}
+
+ body.unified .win{
+  display:grid!important;
+  grid-template-columns:64px repeat(3,minmax(92px,1fr))!important;
+  grid-template-rows:38px 38px!important;
+  gap:6px!important;
+  padding:8px!important;
+ }
+ body.unified .win>b{grid-column:1!important;grid-row:1!important;margin:0!important}
+ body.unified .win .winChoice{width:100%!important;min-width:0!important;padding:0 9px!important}
+ body.unified .win .winChoice:nth-of-type(1){grid-column:2!important;grid-row:1!important}
+ body.unified .win .winChoice:nth-of-type(2){grid-column:3!important;grid-row:1!important}
+ body.unified .win .winChoice:nth-of-type(3){grid-column:4!important;grid-row:1!important}
+ body.unified .win #rankNumber{grid-column:1/4!important;grid-row:2!important;width:100%!important;min-width:0!important}
+ body.unified .win #applyWin{grid-column:4!important;grid-row:2!important;width:100%!important}
+ body.unified .win #winSaved{
+  grid-column:1/-1!important;
+  grid-row:3!important;
+  height:16px!important;
+  min-height:16px!important;
+  margin:0!important;
+  line-height:16px!important;
+ }
+
+ body.unified .actionGroup{
+  display:grid!important;
+  grid-template-columns:minmax(150px,1.3fr) repeat(2,minmax(96px,1fr))!important;
+  grid-template-rows:38px 38px 38px auto!important;
+  gap:6px!important;
+  padding:8px!important;
+ }
+ body.unified .actionGroup #mapSelect{grid-column:1!important;grid-row:1!important;width:100%!important;flex:none!important}
+ body.unified .actionGroup #startBtn{grid-column:2!important;grid-row:1!important;width:100%!important}
+ body.unified .actionGroup #resetBtn{grid-column:3!important;grid-row:1!important;width:100%!important}
+ body.unified .actionGroup #clearBtn{grid-column:1!important;grid-row:2!important;width:100%!important}
+ body.unified .actionGroup>b{grid-column:2/4!important;grid-row:2!important;height:38px!important;margin:0!important}
+ body.unified .actionGroup .recentRestore{grid-column:1/-1!important;grid-row:3!important;width:100%!important}
+ body.unified .recentRestore select,
+ body.unified .recentRestore button{height:38px!important;min-height:38px!important}
+ body.unified .actionGroup #memberLink{grid-column:1/-1!important;grid-row:4!important;margin:0!important}
+}
+
+@media (max-width:720px){
+ body.unified .stage{height:400px!important;min-height:400px!important}
+ body.unified .mergedEntryGroup{
+  grid-template-columns:72px 82px 72px minmax(105px,1fr) 62px 82px!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{grid-column:1!important}
+ body.unified .mergedEntryGroup #ownerInput{grid-column:2!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:3!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:4!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:5!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:6!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/5!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:5!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:6!important}
+}
+
+
+/* v17.20: 등록 이름 기반 최근 핀볼 3세트 */
+body.unified .recentRestore{
+ display:grid!important;
+ grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:6px!important;
+ width:100%!important;
+ min-width:0!important;
+}
+body.unified .recentRestore .recentSetBtn{
+ display:grid!important;
+ grid-template-columns:22px minmax(0,1fr) auto!important;
+ align-items:center!important;
+ gap:5px!important;
+ width:100%!important;
+ min-width:0!important;
+ height:44px!important;
+ padding:0 8px!important;
+ text-align:left!important;
+}
+body.unified .recentSetBtn>span{
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ width:21px;
+ height:21px;
+ border-radius:7px;
+ background:rgba(124,92,255,.35);
+ color:#fff;
+ font-size:11px;
+}
+body.unified .recentSetBtn>b{
+ min-width:0;
+ overflow:hidden;
+ text-overflow:ellipsis;
+ white-space:nowrap;
+ font-size:12px;
+}
+body.unified .recentSetBtn>small{
+ color:#8fffc2;
+ font-size:11px;
+ white-space:nowrap;
+}
+body.unified .recentEmpty{
+ grid-column:1/-1;
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ height:44px;
+ color:#91a4cc;
+ font-size:12px;
+ border:1px dashed rgba(149,168,255,.28);
+ border-radius:9px;
+}
+@media(max-width:1050px){
+ body.unified .recentRestore .recentSetBtn,
+ body.unified .recentEmpty{height:38px!important;min-height:38px!important}
+}
+@media(max-width:620px){
+ body.unified .recentRestore{grid-template-columns:1fr!important}
+}
+
+
+/* v17.21: 좁고 세로로 긴 창에서도 세 조작 분류를 한 줄에 모두 표시 */
+@media (min-width:761px) and (max-width:1050px){
+ body.unified .stage{
+  height:clamp(380px,43vh,460px)!important;
+  min-height:380px!important;
+ }
+ body.unified .adminGrid{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.18fr) minmax(0,.92fr) minmax(0,1.05fr)!important;
+  grid-template-rows:auto!important;
+  gap:7px!important;
+  align-items:stretch!important;
+ }
+ body.unified .mergedEntryGroup,
+ body.unified .win,
+ body.unified .actionGroup{
+  grid-row:1!important;
+  width:100%!important;
+  min-width:0!important;
+  padding:8px!important;
+  align-self:stretch!important;
+ }
+ body.unified .mergedEntryGroup{grid-column:1!important}
+ body.unified .win{grid-column:2!important}
+ body.unified .actionGroup{grid-column:3!important}
+
+ body.unified .adminGrid input,
+ body.unified .adminGrid textarea,
+ body.unified .adminGrid select,
+ body.unified .adminGrid button,
+ body.unified .adminGrid .winChoice{
+  height:36px!important;
+  min-height:36px!important;
+  padding-left:8px!important;
+  padding-right:8px!important;
+  font-size:12px!important;
+ }
+
+ body.unified .mergedEntryGroup{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 62px 78px!important;
+  grid-template-rows:18px repeat(3,36px)!important;
+  gap:6px!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{
+  grid-column:1/-1!important;
+  grid-row:1!important;
+  font-size:14px!important;
+  line-height:18px!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:1/3!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:1!important;grid-row:3!important;max-width:none!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:2!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:3!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1!important;grid-row:4!important;height:36px!important;max-width:none!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:2!important;grid-row:4!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:3!important;grid-row:4!important;width:100%!important}
+
+ body.unified .win{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:18px 36px 36px 18px!important;
+  gap:6px!important;
+ }
+ body.unified .win>b{grid-column:1/-1!important;grid-row:1!important;font-size:14px!important;line-height:18px!important}
+ body.unified .win .winChoice{width:100%!important;min-width:0!important;padding:0 5px!important;font-size:12px!important}
+ body.unified .win .winChoice:nth-of-type(1){grid-column:1!important;grid-row:2!important}
+ body.unified .win .winChoice:nth-of-type(2){grid-column:2!important;grid-row:2!important}
+ body.unified .win .winChoice:nth-of-type(3){grid-column:3!important;grid-row:2!important}
+ body.unified .win #rankNumber{grid-column:1/3!important;grid-row:3!important;width:100%!important}
+ body.unified .win #applyWin{grid-column:3!important;grid-row:3!important;width:100%!important}
+ body.unified .win #winSaved{
+  grid-column:1/-1!important;
+  grid-row:4!important;
+  height:18px!important;
+  min-height:18px!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  font-size:10px!important;
+ }
+
+ body.unified .actionGroup{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-template-rows:36px 36px 36px 36px!important;
+  gap:6px!important;
+ }
+ body.unified .actionGroup #mapSelect{grid-column:1/-1!important;grid-row:1!important;width:100%!important}
+ body.unified .actionGroup #startBtn{grid-column:1!important;grid-row:2!important;width:100%!important}
+ body.unified .actionGroup #resetBtn{grid-column:2!important;grid-row:2!important;width:100%!important}
+ body.unified .actionGroup #clearBtn{grid-column:1!important;grid-row:3!important;width:100%!important}
+ body.unified .actionGroup>b{
+  grid-column:2!important;
+  grid-row:3!important;
+  height:36px!important;
+  min-height:36px!important;
+  padding:0 8px!important;
+  font-size:12px!important;
+ }
+ body.unified .actionGroup .recentRestore{
+  grid-column:1/-1!important;
+  grid-row:4!important;
+  height:36px!important;
+  gap:4px!important;
+ }
+ body.unified .recentRestore .recentSetBtn,
+ body.unified .recentEmpty{
+  height:36px!important;
+  min-height:36px!important;
+  padding:0 5px!important;
+ }
+ body.unified .recentSetBtn>span{display:none!important}
+ body.unified .recentSetBtn>b{font-size:10px!important}
+ body.unified .recentSetBtn>small{font-size:9px!important}
+ body.unified .actionGroup #memberLink{display:none!important}
+}
+
+
+/* v17.22: 참가자 입력 카드 제목과 조작칸을 같은 기준선으로 정렬 */
+@media (min-width:1051px){
+ body.unified .mergedEntryGroup{
+  display:grid!important;
+  grid-template-columns:86px 82px 82px minmax(130px,1fr) 66px 94px!important;
+  grid-template-rows:44px 44px!important;
+  gap:7px!important;
+  align-items:center!important;
+  align-content:start!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  font-size:15px!important;
+  line-height:44px!important;
+  white-space:nowrap!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:2!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:4!important;grid-row:1!important;width:100%!important;max-width:none!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:5!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:6!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/5!important;grid-row:2!important;width:100%!important;max-width:none!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:5!important;grid-row:2!important;width:100%!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:6!important;grid-row:2!important;width:100%!important}
+}
+@media (min-width:761px) and (max-width:1050px){
+ body.unified .mergedEntryGroup{
+  grid-template-columns:76px minmax(0,1fr) 62px 78px!important;
+  grid-template-rows:36px 36px 36px!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{
+  grid-column:1!important;
+  grid-row:1!important;
+  line-height:36px!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:2/4!important;grid-row:1!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:4!important;grid-row:1!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:1/3!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:3!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:4!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/3!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:3!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:4!important;grid-row:3!important}
+}
