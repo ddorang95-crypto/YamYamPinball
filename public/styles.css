@@ -1471,3 +1471,133 @@ body.unified .recentRestore button{
 @media (max-width:700px){
  body.unified .actionGroup .recentRestore{flex:1 0 100%!important;width:100%!important}
 }
+
+
+/* v17.19: 가로·세로 창 모두 compact한 3분류 관리자 UI */
+@media (min-width:1051px){
+ body.unified .adminGrid{
+  grid-template-columns:minmax(600px,1.32fr) minmax(390px,.92fr) minmax(430px,1fr)!important;
+  gap:10px!important;
+  align-items:stretch!important;
+ }
+ body.unified .mergedEntryGroup{
+  grid-column:1!important;
+  grid-row:1!important;
+  grid-template-columns:96px 86px minmax(170px,1fr) 76px 96px!important;
+  grid-template-rows:20px 44px 44px!important;
+  padding:10px!important;
+  gap:7px!important;
+  align-content:start!important;
+ }
+ body.unified .mergedEntryGroup #nameInput,
+ body.unified .mergedEntryGroup #bulkInput{
+  width:100%!important;
+  max-width:none!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:1!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:2!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:3!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:4!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:5!important;grid-row:2!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/4!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:4!important;grid-row:3!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:5!important;grid-row:3!important;width:100%!important;min-width:0!important}
+}
+
+/* 폭이 좁은 창: 참가자 입력을 2줄로 압축하고 세 분류가 빨리 보이게 함 */
+@media (max-width:1050px){
+ body.unified .stage{
+  height:clamp(390px,44vh,500px)!important;
+  min-height:390px!important;
+ }
+ body.unified .unifiedBottom{padding:8px!important}
+ body.unified .adminGrid{gap:7px!important}
+ body.unified .adminGrid .group{padding:8px!important}
+ body.unified .adminGrid input,
+ body.unified .adminGrid textarea,
+ body.unified .adminGrid select,
+ body.unified .adminGrid button,
+ body.unified .adminGrid .winChoice{
+  height:38px!important;
+  min-height:38px!important;
+  border-radius:8px!important;
+ }
+ body.unified .mergedEntryGroup{
+  display:grid!important;
+  grid-template-columns:82px 92px 82px minmax(150px,1fr) 70px 92px 70px!important;
+  grid-template-rows:38px 38px!important;
+  gap:6px!important;
+  align-items:center!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{
+  grid-column:1!important;
+  grid-row:1!important;
+  margin:0!important;
+  font-size:15px!important;
+  white-space:nowrap!important;
+ }
+ body.unified .mergedEntryGroup #ownerInput{grid-column:2!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:4!important;grid-row:1!important;width:100%!important;max-width:none!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:5!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:6/8!important;grid-row:1!important;width:100%!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/6!important;grid-row:2!important;width:100%!important;max-width:none!important;height:38px!important;resize:none!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:6!important;grid-row:2!important;width:100%!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:7!important;grid-row:2!important;width:100%!important;min-width:0!important}
+
+ body.unified .win{
+  display:grid!important;
+  grid-template-columns:64px repeat(3,minmax(92px,1fr))!important;
+  grid-template-rows:38px 38px!important;
+  gap:6px!important;
+  padding:8px!important;
+ }
+ body.unified .win>b{grid-column:1!important;grid-row:1!important;margin:0!important}
+ body.unified .win .winChoice{width:100%!important;min-width:0!important;padding:0 9px!important}
+ body.unified .win .winChoice:nth-of-type(1){grid-column:2!important;grid-row:1!important}
+ body.unified .win .winChoice:nth-of-type(2){grid-column:3!important;grid-row:1!important}
+ body.unified .win .winChoice:nth-of-type(3){grid-column:4!important;grid-row:1!important}
+ body.unified .win #rankNumber{grid-column:1/4!important;grid-row:2!important;width:100%!important;min-width:0!important}
+ body.unified .win #applyWin{grid-column:4!important;grid-row:2!important;width:100%!important}
+ body.unified .win #winSaved{
+  grid-column:1/-1!important;
+  grid-row:3!important;
+  height:16px!important;
+  min-height:16px!important;
+  margin:0!important;
+  line-height:16px!important;
+ }
+
+ body.unified .actionGroup{
+  display:grid!important;
+  grid-template-columns:minmax(150px,1.3fr) repeat(2,minmax(96px,1fr))!important;
+  grid-template-rows:38px 38px 38px auto!important;
+  gap:6px!important;
+  padding:8px!important;
+ }
+ body.unified .actionGroup #mapSelect{grid-column:1!important;grid-row:1!important;width:100%!important;flex:none!important}
+ body.unified .actionGroup #startBtn{grid-column:2!important;grid-row:1!important;width:100%!important}
+ body.unified .actionGroup #resetBtn{grid-column:3!important;grid-row:1!important;width:100%!important}
+ body.unified .actionGroup #clearBtn{grid-column:1!important;grid-row:2!important;width:100%!important}
+ body.unified .actionGroup>b{grid-column:2/4!important;grid-row:2!important;height:38px!important;margin:0!important}
+ body.unified .actionGroup .recentRestore{grid-column:1/-1!important;grid-row:3!important;width:100%!important}
+ body.unified .recentRestore select,
+ body.unified .recentRestore button{height:38px!important;min-height:38px!important}
+ body.unified .actionGroup #memberLink{grid-column:1/-1!important;grid-row:4!important;margin:0!important}
+}
+
+@media (max-width:720px){
+ body.unified .stage{height:400px!important;min-height:400px!important}
+ body.unified .mergedEntryGroup{
+  grid-template-columns:72px 82px 72px minmax(105px,1fr) 62px 82px!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{grid-column:1!important}
+ body.unified .mergedEntryGroup #ownerInput{grid-column:2!important}
+ body.unified .mergedEntryGroup #saveOwner{grid-column:3!important}
+ body.unified .mergedEntryGroup #nameInput{grid-column:4!important}
+ body.unified .mergedEntryGroup #countInput{grid-column:5!important}
+ body.unified .mergedEntryGroup #addBtn{grid-column:6!important}
+ body.unified .mergedEntryGroup #bulkInput{grid-column:1/5!important}
+ body.unified .mergedEntryGroup #bulkBtn{grid-column:5!important}
+ body.unified .mergedEntryGroup #shuffleBtn{grid-column:6!important}
+}
