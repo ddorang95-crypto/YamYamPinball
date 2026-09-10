@@ -461,12 +461,16 @@ function bindAdmin(){
   clearWinnerPopupEverywhereLocal();
   resetInFlight=true;mutationBusy=true;
   const btn=$('resetBtn');if(btn){btn.disabled=true;btn.textContent='새 판 준비 중'}
+  const keptParticipants=Array.isArray(state?.participants)?state.participants.map(p=>({...p})):[];
   try{
    const j=await apiQuiet('resetRace',{},8000);
    if(!j?.ok)throw Error(j?.error||'초기화 오류');
    cancelSyncStart();stopStartCountdown();localStartHardNotBefore=0;localWinnerLatch=null;stopLocalRace({clearParticipants:false});
    clearWinnerPopupEverywhereLocal();
-   if(j.state)state=j.state;
+   if(j.state){
+    if(keptParticipants.length&&(!Array.isArray(j.state.participants)||!j.state.participants.length))j.state.participants=keptParticipants;
+    state=j.state;
+   }
    winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
    ui();flash('경기 초기화 전체 화면 적용 완료');
   }catch(e){flash('경기 초기화 실패: '+(e?.message||'통신 오류'))}
@@ -567,7 +571,30 @@ function previewGridBalls(){
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const mapNames={wheel:'🍭 캔디 수레바퀴',greed:'🏺 욕망의 항아리 REMIX'};
 function ui(){if(!state)return;refreshNameColors();if($('brand'))$('brand').textContent=state.title;if($('roomCode'))$('roomCode').textContent=state.code;if($('ballCount'))$('ballCount').textContent=balls().length;const modeText=state.mode==='solo'?'개인 핀볼':'단체 핀볼';if($('modeLabel'))$('modeLabel').textContent=modeText;if($('modeBadge')){$('modeBadge').textContent=modeText;$('modeBadge').className=state.mode==='solo'?'solo':'group'};if($('mapBadge'))$('mapBadge').textContent=mapNames[state.map]||state.map;const winText=state.winMode==='first'?'당첨: 첫 번째':state.winMode==='last'?'당첨: 마지막':'당첨: '+(state.winningRanks||[1]).join(', ')+'번째';if($('winBadge'))$('winBadge').textContent=winText;
- if(role==='admin'){if($('titleInput'))$('titleInput').value=state.title;const fixedMap=selectedMapLock||pendingMap||state.map;selectedMapLock=mapNames[fixedMap]?fixedMap:(selectedMapLock||'wheel');$('mapSelect').value=selectedMapLock;$('mapSelect').disabled=false;const shownMode=pendingWinMode||(winDraft?.mode)||state.winMode||'first';const shownRanks=shownMode==='last'?[Math.max(1,balls().length)]:((winDraft?.ranks)||state.winningRanks||[1]);const wr=document.querySelector(`input[name=win][value=${shownMode}]`);if(wr)wr.checked=true;if(!pendingWinMode)$('rankNumber').value=shownRanks.join(',');$('rankNumber').disabled=shownMode!=='number';$('memberLink').textContent=location.origin+'/member.html?room='+state.code;if($('soloBtn'))$('soloBtn').classList.toggle('selected',state.mode==='solo');if($('groupBtn'))$('groupBtn').classList.toggle('selected',state.mode==='group');document.querySelectorAll('.winChoice').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));if($('winSaved')&&!pendingWinMode){const wt=shownMode==='first'?'당첨: 첫 번째':shownMode==='last'?'당첨: 마지막':'당첨: '+shownRanks.join(', ')+'번째';$('winSaved').textContent='현재 설정: '+wt}}
+ if(role==='admin'){if($('titleInput'))$('titleInput').value=state.title;const fixedMap=selectedMapLock||pendingMap||state.map;selectedMapLock=mapNames[fixedMap]?fixedMap:(selectedMapLock||'wheel');$('mapSelect').value=selectedMapLock;$('mapSelect').disabled=false;const shownMode=pendingWinMode||(winDraft?.mode)||state.winMode||'first';const shownRanks=shownMode==='last'?[Math.max(1,balls().length)]:((winDraft?.ranks)||state.winningRanks||[1]);const wr=document.querySelector(`input[name=win][value=${shownMode}]`);if(wr)wr.checked=true;if(!pendingWinMode)$('rankNumber').value=shownRanks.join(',');$('rankNumber').disabled=shownMode!=='number';$('memberLink').textContent=location.origin+'/member.html?room='+state.code;
+ const recent=Array.isArray(state.recentPinballs)?state.recentPinballs:[];
+ const recentButtons=$('recentSetButtons');
+ if(recentButtons){
+  recentButtons.innerHTML=recent.length?recent.map((item,index)=>{
+   const fallback=(item.participants||[]).map(p=>p.name).filter(Boolean).slice(0,3).join(' · ')||('최근 핀볼 '+(index+1));
+   const label=item.title||fallback;
+   return '<button type="button" class="recentSetBtn" data-history-id="'+esc(item.id)+'" title="'+esc(label)+' · '+Number(item.totalBalls||0)+'공"><span>'+(index+1)+'</span><b>'+esc(label)+'</b><small>'+Number(item.totalBalls||0)+'공</small></button>'
+  }).join(''):'<span class="recentEmpty">아직 자동 저장된 핀볼이 없어요</span>';
+  recentButtons.querySelectorAll('.recentSetBtn').forEach(btn=>btn.onclick=async()=>{
+   const historyId=btn.dataset.historyId||'';
+   if(!historyId||!confirm('「'+(btn.querySelector('b')?.textContent||'선택한 핀볼')+'」 구성을 불러올까요?'))return;
+   try{
+    const j=await apiQuiet('restoreRecentPinball',{historyId},8000);
+    if(!j?.ok)throw Error(j?.error||'복구 오류');
+    cancelSyncStart();stopStartCountdown();stopLocalRace({clearParticipants:false});
+    if(j.state)state=j.state;
+    selectedMapLock=state.map;pendingMap=null;
+    winDraft={mode:state.winMode||'first',ranks:[...(state.winningRanks||[1])],dirty:false};
+    ui();flash('저장된 핀볼 구성을 그대로 불러왔어요');
+   }catch(e){flash('구성 불러오기 실패: '+(e?.message||'통신 오류'))}
+  });
+ }
+ if($('soloBtn'))$('soloBtn').classList.toggle('selected',state.mode==='solo');if($('groupBtn'))$('groupBtn').classList.toggle('selected',state.mode==='group');document.querySelectorAll('.winChoice').forEach(l=>l.classList.toggle('selected',l.querySelector('input')?.checked));if($('winSaved')&&!pendingWinMode){const wt=shownMode==='first'?'당첨: 첫 번째':shownMode==='last'?'당첨: 마지막':'당첨: '+shownRanks.join(', ')+'번째';$('winSaved').textContent='현재 설정: '+wt}}
  if($('participants')){const l=(role==='member'&&!unifiedMode)?(state.participants||[]).filter(p=>p.owner===owner):(state.participants||[]),groups=new Map();for(const p of l){const key=(p.owner||'')+'\u0000'+p.name;const g=groups.get(key)||{name:p.name,owner:p.owner,ownerInitial:ownerMark(p.owner||p.ownerInitial),total:0,ids:[]};g.total+=Number(p.count)||0;g.ids.push(p.id);if(!g.ownerInitial)g.ownerInitial=ownerMark(p.owner||p.ownerInitial);groups.set(key,g)}const rows=[...groups.values()].sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name,'ko'));$('participants').innerHTML=rows.length?rows.map((g,i)=>`<div class=pitem style="--personColor:${getNameColor(g.name,1)};--personSoft:${getNameColor(g.name,.13)}"><span class=personRank>${i+1}</span><span class=colorDot style="--dot:${getNameColor(g.name,1)}"></span><span class=ownerInitialBadge title="${esc(g.owner||'입력자')}">${esc(ownerMark(g.owner||g.ownerInitial))}</span><b class=participantName title="${esc(g.name)}">${esc(g.name)}</b><div class=ballAdjust data-ids="${g.ids.join(',')}"><button class=countMinus type=button aria-label="공 1개 빼기">−</button><span class=personBallCount><strong>${g.total}</strong><small>개</small></span><button class=countPlus type=button aria-label="공 1개 추가">＋</button><button class=countSet type=button>갯수 조정</button></div></div>`).join(''):'<div class=emptyParticipants>추가된 참가자가 없습니다</div>';if($('participantSummary'))$('participantSummary').textContent=`${rows.length}명 · 총 ${rows.reduce((n,g)=>n+g.total,0)}공`;document.querySelectorAll('.ballAdjust').forEach(box=>{const ids=box.dataset.ids.split(',').filter(Boolean),current=Number(box.querySelector('.personBallCount strong')?.textContent)||0;box.querySelector('.countMinus').onclick=async()=>{if(current<=1&&!confirm('이 참가자의 마지막 공까지 뺄까요?'))return;try{await api('adjustParticipantGroup',{ids,delta:-1,owner,admin:role==='admin'})}catch(e){flash(e.message||'개수 변경 실패')}};box.querySelector('.countPlus').onclick=async()=>{try{await api('adjustParticipantGroup',{ids,delta:1,owner,admin:role==='admin'})}catch(e){flash(e.message||'개수 변경 실패')}};box.querySelector('.countSet').onclick=()=>{const raw=prompt('변경할 전체 공 개수를 입력해주세요. (0 입력 시 참가자 삭제)',String(current));if(raw===null)return;const count=Number(raw);if(!Number.isInteger(count)||count<0||count>5000){flash('0~5000 사이의 정수를 입력해주세요');return}if(count===0&&!confirm('이 참가자를 삭제할까요?'))return;api('adjustParticipantGroup',{ids,count,owner,admin:role==='admin'}).catch(e=>flash(e.message||'개수 변경 실패'))}})}
  renderWinner();}
 function hash(s){let h=2166136261;for(let c of String(s)){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
