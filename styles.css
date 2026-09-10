@@ -1660,6 +1660,7 @@ body.unified .recentEmpty{
  body.unified .recentRestore .recentSetBtn,
  body.unified .recentEmpty{height:38px!important;min-height:38px!important}
 }
+
 @media(max-width:620px){
  body.unified .recentRestore{grid-template-columns:1fr!important}
 }
@@ -1975,10 +1976,44 @@ body.unified .recentDeleteBtn:hover{
   min-height:36px!important;
   font-size:14px!important;
  }
- body.unified .recentSetItem{grid-template-columns:minmax(0,1fr) 20px}
+body.unified .recentSetItem{grid-template-columns:minmax(0,1fr) 20px}
  body.unified .mergedEntryGroup #bulkBtn{
   white-space:nowrap!important;
   letter-spacing:-.7px!important;
   overflow:hidden!important;
+ }
+}
+
+/* v17.25: 중간 창 크기에서도 참가자 입력 버튼이 카드 밖으로 나가지 않게 정리 */
+body.unified .adminGrid,
+body.unified .adminGrid > *,
+body.unified .mergedEntryGroup > *,
+body.unified .actionGroup > *{
+ min-width:0!important;
+ max-width:100%!important;
+ box-sizing:border-box!important;
+}
+@media (min-width:1051px) and (max-width:1450px){
+ body.unified .mergedEntryGroup{
+  grid-template-columns:minmax(68px,76px) minmax(50px,62px) minmax(54px,66px) minmax(72px,1fr) minmax(44px,54px) minmax(56px,68px)!important;
+  gap:5px!important;
+  overflow:hidden!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{
+  font-size:13px!important;
+  letter-spacing:-.5px!important;
+ }
+ body.unified .mergedEntryGroup button{
+  padding-left:4px!important;
+  padding-right:4px!important;
+  font-size:11px!important;
+  letter-spacing:-.45px!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+ }
+ body.unified .mergedEntryGroup #bulkBtn,
+ body.unified .mergedEntryGroup #shuffleBtn{
+  width:100%!important;
+  min-width:0!important;
  }
 }
