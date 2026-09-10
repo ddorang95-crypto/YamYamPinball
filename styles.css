@@ -2046,3 +2046,92 @@ body.unified .mergedEntryGroup #bulkBtn,
   min-width:0!important;
  }
 }
+
+/* v17.30: 세 카드가 비좁아지기 전에 세로형으로 전환 */
+@media (max-width:900px){
+ body.unified .adminGrid{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto auto!important;
+  gap:8px!important;
+ }
+ body.unified .mergedEntryGroup,
+ body.unified .win,
+ body.unified .actionGroup{
+  grid-column:1!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  overflow:hidden!important;
+ }
+ body.unified .mergedEntryGroup{grid-row:1!important}
+ body.unified .win{grid-row:2!important}
+ body.unified .actionGroup{grid-row:3!important}
+ body.unified .adminGrid .group{padding:8px!important}
+ body.unified .adminGrid input,
+ body.unified .adminGrid textarea,
+ body.unified .adminGrid select,
+ body.unified .adminGrid button,
+ body.unified .adminGrid .winChoice{
+  height:36px!important;
+  min-height:36px!important;
+  padding-left:7px!important;
+  padding-right:7px!important;
+  font-size:12px!important;
+ }
+}
+
+/* v17.31: 중간 화면에서는 3카드를 유지하고 카드 내부만 안전하게 줄바꿈 */
+@media (min-width:901px) and (max-width:1250px){
+ body.unified .win{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  grid-template-rows:18px 36px 36px 18px!important;
+  gap:6px!important;
+  overflow:hidden!important;
+ }
+ body.unified .win>b{grid-column:1/-1!important;grid-row:1!important;line-height:18px!important}
+ body.unified .win .winChoice{
+  width:100%!important;
+  min-width:0!important;
+  height:36px!important;
+  min-height:36px!important;
+  padding:0 4px!important;
+  font-size:11px!important;
+  white-space:nowrap!important;
+ }
+ body.unified .win .winChoice:nth-of-type(1){grid-column:1!important;grid-row:2!important}
+ body.unified .win .winChoice:nth-of-type(2){grid-column:2!important;grid-row:2!important}
+ body.unified .win .winChoice:nth-of-type(3){grid-column:3!important;grid-row:2!important}
+ body.unified .win #rankNumber{grid-column:1/3!important;grid-row:3!important;width:100%!important;min-width:0!important}
+ body.unified .win #applyWin{grid-column:3!important;grid-row:3!important;width:100%!important;min-width:0!important}
+ body.unified .win #winSaved{
+  grid-column:1/-1!important;
+  grid-row:4!important;
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+ }
+ body.unified .actionGroup{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-template-rows:36px 36px 36px 40px!important;
+  gap:6px!important;
+  overflow:hidden!important;
+ }
+ body.unified .actionGroup #mapSelect{grid-column:1/-1!important;grid-row:1!important;width:100%!important;min-width:0!important}
+ body.unified .actionGroup #startBtn{grid-column:1!important;grid-row:2!important;width:100%!important;min-width:0!important}
+ body.unified .actionGroup #resetBtn{grid-column:2!important;grid-row:2!important;width:100%!important;min-width:0!important}
+ body.unified .actionGroup #clearBtn{grid-column:1!important;grid-row:3!important;width:100%!important;min-width:0!important}
+ body.unified .actionGroup>b{grid-column:2!important;grid-row:3!important;min-width:0!important;margin:0!important}
+ body.unified .actionGroup .recentRestore{grid-column:1/-1!important;grid-row:4!important;width:100%!important;min-width:0!important}
+ body.unified .actionGroup #memberLink{display:none!important}
+ body.unified .actionGroup button,
+ body.unified .actionGroup select{
+  padding-left:5px!important;
+  padding-right:5px!important;
+  font-size:11px!important;
+  white-space:nowrap!important;
+ }
+}
