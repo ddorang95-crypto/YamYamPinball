@@ -2082,7 +2082,7 @@ body.unified .mergedEntryGroup #bulkBtn,
 }
 
 /* v17.31: 중간 화면에서는 3카드를 유지하고 카드 내부만 안전하게 줄바꿈 */
-@media (min-width:901px) and (max-width:1250px){
+@media (min-width:901px) and (max-width:1450px){
  body.unified .win{
   display:grid!important;
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
@@ -2134,4 +2134,15 @@ body.unified .mergedEntryGroup #bulkBtn,
   font-size:11px!important;
   white-space:nowrap!important;
  }
+}
+
+/* v17.32: 모든 화면에서 조작 요소가 소속 카드 경계를 넘지 않도록 제한 */
+body.unified .adminGrid .group,
+body.unified .adminGrid .group > *{
+ max-width:100%!important;
+ min-width:0!important;
+ box-sizing:border-box!important;
+}
+body.unified .adminGrid .group{
+ overflow:hidden!important;
 }
