@@ -24,8 +24,8 @@ const mime = {
 
 const now = () => Date.now();
 const cleanRoom = (value) => {
-  const code = String(value || 'YAMYAM').replace(/[^A-Za-z0-9_-]/g, '').toUpperCase();
-  return code || 'YAMYAM';
+  const code = String(value || 'GROUP').replace(/[^A-Za-z0-9_-]/g, '').toUpperCase();
+  return code || 'GROUP';
 };
 
 function emptySnapshot() {
