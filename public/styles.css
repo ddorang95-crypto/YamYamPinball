@@ -1894,3 +1894,91 @@ body.unified .recentEmpty{
   width:100%!important;
  }
 }
+
+
+/* v17.24: 중간 폭 3열 고정 + 저장 세트 개별 삭제 */
+body.unified .recentSetItem{
+ display:grid;
+ grid-template-columns:minmax(0,1fr) 24px;
+ gap:3px;
+ min-width:0;
+ width:100%;
+}
+body.unified .recentSetItem .recentSetBtn{
+ min-width:0!important;
+ width:100%!important;
+}
+body.unified .recentDeleteBtn{
+ display:flex!important;
+ align-items:center!important;
+ justify-content:center!important;
+ width:24px!important;
+ min-width:24px!important;
+ height:44px!important;
+ min-height:44px!important;
+ padding:0!important;
+ border-color:rgba(255,91,139,.42)!important;
+ color:#ff8caf!important;
+ background:rgba(93,22,51,.34)!important;
+ font-size:16px!important;
+ line-height:1!important;
+}
+body.unified .recentDeleteBtn:hover{
+ background:rgba(208,46,100,.45)!important;
+ color:#fff!important;
+}
+@media (min-width:1051px) and (max-width:1450px){
+ body.unified .adminGrid{
+  grid-template-columns:minmax(0,1.35fr) minmax(0,.9fr) minmax(0,1fr)!important;
+  grid-template-rows:auto!important;
+  gap:8px!important;
+  align-items:stretch!important;
+ }
+ body.unified .mergedEntryGroup,
+ body.unified .win,
+ body.unified .actionGroup{
+  grid-row:1!important;
+  min-width:0!important;
+  width:100%!important;
+  align-self:stretch!important;
+ }
+ body.unified .mergedEntryGroup{grid-column:1!important}
+ body.unified .win{grid-column:2!important}
+ body.unified .actionGroup{grid-column:3!important}
+
+ body.unified .mergedEntryGroup{
+  grid-template-columns:80px 76px 78px minmax(95px,1fr) 78px 86px!important;
+ }
+ body.unified .mergedEntryGroup .cardTitle{font-size:14px!important}
+ body.unified .mergedEntryGroup #bulkBtn{
+  min-width:78px!important;
+  width:78px!important;
+  padding:0 4px!important;
+  font-size:12px!important;
+  white-space:nowrap!important;
+ }
+ body.unified .mergedEntryGroup #shuffleBtn{
+  min-width:0!important;
+  width:100%!important;
+ }
+ body.unified .actionGroup #memberLink{
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+ }
+}
+@media(max-width:1050px){
+ body.unified .recentDeleteBtn{
+  width:20px!important;
+  min-width:20px!important;
+  height:36px!important;
+  min-height:36px!important;
+  font-size:14px!important;
+ }
+ body.unified .recentSetItem{grid-template-columns:minmax(0,1fr) 20px}
+ body.unified .mergedEntryGroup #bulkBtn{
+  white-space:nowrap!important;
+  letter-spacing:-.7px!important;
+  overflow:hidden!important;
+ }
+}
