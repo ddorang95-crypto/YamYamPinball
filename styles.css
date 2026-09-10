@@ -1206,82 +1206,6 @@ body.unified .participantList .personBallCount strong{position:static!important;
  }
 }
 
-/* v17.28: 이전 중간 폭 규칙보다 뒤에서 최종 반응형 배치를 확정 */
-@media (min-width:761px) and (max-width:1250px){
- body.unified .adminGrid{
-  grid-template-columns:minmax(0,1fr)!important;
-  grid-template-rows:auto auto auto!important;
-  gap:8px!important;
- }
- body.unified .mergedEntryGroup{grid-column:1!important;grid-row:1!important}
- body.unified .win{grid-column:1!important;grid-row:2!important}
- body.unified .actionGroup{grid-column:1!important;grid-row:3!important}
- body.unified .mergedEntryGroup,
- body.unified .win,
- body.unified .actionGroup{
-  min-width:0!important;
-  width:100%!important;
-  overflow:hidden!important;
- }
- body.unified .mergedEntryGroup{
-  grid-template-columns:80px 92px 76px minmax(110px,1fr) 56px 76px!important;
-  grid-template-rows:36px 36px!important;
-  gap:6px!important;
- }
- body.unified .mergedEntryGroup .cardTitle{grid-column:1!important;grid-row:1!important;line-height:36px!important}
- body.unified .mergedEntryGroup #ownerInput{grid-column:2!important;grid-row:1!important}
- body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:1!important}
- body.unified .mergedEntryGroup #nameInput{grid-column:4!important;grid-row:1!important}
- body.unified .mergedEntryGroup #countInput{grid-column:5!important;grid-row:1!important}
- body.unified .mergedEntryGroup #addBtn{grid-column:6!important;grid-row:1!important}
- body.unified .mergedEntryGroup #bulkInput{grid-column:1/5!important;grid-row:2!important}
- body.unified .mergedEntryGroup #bulkBtn{grid-column:5!important;grid-row:2!important}
- body.unified .mergedEntryGroup #shuffleBtn{grid-column:6!important;grid-row:2!important}
- body.unified .mergedEntryGroup button{
-  min-width:0!important;
-  width:100%!important;
-  padding-left:5px!important;
-  padding-right:5px!important;
-  white-space:nowrap!important;
- }
-}
-
-/* v17.26: 태블릿/작은 데스크톱에서는 설정 카드를 한 줄씩 배치 */
-@media (min-width:761px) and (max-width:1250px){
- body.unified .adminGrid{
-  display:grid!important;
-  grid-template-columns:minmax(0,1fr)!important;
-  grid-template-rows:auto auto auto!important;
-  gap:8px!important;
- }
- body.unified .mergedEntryGroup,
- body.unified .win,
- body.unified .actionGroup{
-  grid-column:1!important;
-  width:100%!important;
-  min-width:0!important;
-  overflow:hidden!important;
- }
- body.unified .mergedEntryGroup{grid-row:1!important}
- body.unified .win{grid-row:2!important}
- body.unified .actionGroup{grid-row:3!important}
- body.unified .mergedEntryGroup{
-  grid-template-columns:80px 92px 76px minmax(110px,1fr) 56px 76px!important;
-  grid-template-rows:36px 36px!important;
-  gap:6px!important;
- }
- body.unified .mergedEntryGroup .cardTitle{grid-column:1!important;grid-row:1!important;line-height:36px!important}
- body.unified .mergedEntryGroup #ownerInput{grid-column:2!important;grid-row:1!important}
- body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:1!important}
- body.unified .mergedEntryGroup #nameInput{grid-column:4!important;grid-row:1!important}
- body.unified .mergedEntryGroup #countInput{grid-column:5!important;grid-row:1!important}
- body.unified .mergedEntryGroup #addBtn{grid-column:6!important;grid-row:1!important}
- body.unified .mergedEntryGroup #bulkInput{grid-column:1/5!important;grid-row:2!important}
- body.unified .mergedEntryGroup #bulkBtn{grid-column:5!important;grid-row:2!important}
- body.unified .mergedEntryGroup #shuffleBtn{grid-column:6!important;grid-row:2!important}
- body.unified .mergedEntryGroup button{min-width:0!important;width:100%!important;padding-left:5px!important;padding-right:5px!important;white-space:nowrap!important}
-}
-
 /* v17.27: 참가자 카드도 실제 사용 가능한 폭을 확보해 조절 버튼 잘림 방지 */
 @media (max-width:1250px){
  body.unified .participantBoard,
@@ -2120,45 +2044,5 @@ body.unified .mergedEntryGroup #bulkBtn,
  body.unified .mergedEntryGroup #shuffleBtn{
   width:100%!important;
   min-width:0!important;
- }
-}
-
-/* v17.29: 최종 중간 화면 배치 — 아래 규칙이 기존 3열 규칙을 덮어쓴다 */
-@media (min-width:761px) and (max-width:1250px){
- body.unified .adminGrid{
-  grid-template-columns:minmax(0,1fr)!important;
-  grid-template-rows:auto auto auto!important;
-  gap:8px!important;
- }
- body.unified .mergedEntryGroup{grid-column:1!important;grid-row:1!important}
- body.unified .win{grid-column:1!important;grid-row:2!important}
- body.unified .actionGroup{grid-column:1!important;grid-row:3!important}
- body.unified .mergedEntryGroup,
- body.unified .win,
- body.unified .actionGroup{
-  min-width:0!important;
-  width:100%!important;
-  overflow:hidden!important;
- }
- body.unified .mergedEntryGroup{
-  grid-template-columns:80px 92px 76px minmax(110px,1fr) 56px 76px!important;
-  grid-template-rows:36px 36px!important;
-  gap:6px!important;
- }
- body.unified .mergedEntryGroup .cardTitle{grid-column:1!important;grid-row:1!important;line-height:36px!important}
- body.unified .mergedEntryGroup #ownerInput{grid-column:2!important;grid-row:1!important}
- body.unified .mergedEntryGroup #saveOwner{grid-column:3!important;grid-row:1!important}
- body.unified .mergedEntryGroup #nameInput{grid-column:4!important;grid-row:1!important}
- body.unified .mergedEntryGroup #countInput{grid-column:5!important;grid-row:1!important}
- body.unified .mergedEntryGroup #addBtn{grid-column:6!important;grid-row:1!important}
- body.unified .mergedEntryGroup #bulkInput{grid-column:1/5!important;grid-row:2!important}
- body.unified .mergedEntryGroup #bulkBtn{grid-column:5!important;grid-row:2!important}
- body.unified .mergedEntryGroup #shuffleBtn{grid-column:6!important;grid-row:2!important}
- body.unified .mergedEntryGroup button{
-  min-width:0!important;
-  width:100%!important;
-  padding-left:5px!important;
-  padding-right:5px!important;
-  white-space:nowrap!important;
  }
 }
